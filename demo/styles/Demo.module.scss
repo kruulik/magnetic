@@ -1,0 +1,135 @@
+.container {
+  display: flex;
+  min-height: calc(100vh - 120px);
+  margin-right: 300px;
+}
+
+.content {
+  width: 100%;
+  min-height: 100%;
+  position: relative;
+}
+
+.sphereContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.controls {
+  width: 300px;
+  padding: 20px;
+  border-left: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.controlsTitle {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.controlGroup {
+  margin-bottom: 20px;
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  input[type="range"] {
+    width: 100%;
+    margin-bottom: 5px;
+    accent-color: var(--accent-blue);
+  }
+
+  input[type="checkbox"] {
+    margin-right: 8px;
+    accent-color: var(--accent-blue);
+  }
+
+  select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: 4px;
+    transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+  }
+}
+
+.controlValue {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.demoInfo {
+  margin: 20px 0;
+  padding: 15px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+
+  strong {
+    color: var(--text-primary);
+  }
+}
+
+.parametersTitle {
+  margin: 20px 0 15px 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.themeToggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 15px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  z-index: 1001;
+
+  &:hover {
+    background: var(--border-secondary);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.title {
+  color: var(--text-primary);
+  text-align: center;
+  margin-bottom: 40px;
+  font-size: 2rem;
+  font-weight: 400;
+}

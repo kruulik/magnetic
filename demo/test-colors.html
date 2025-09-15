@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Test</title>
+    <style>
+        :root {
+            --sphere-base-hue: 30;
+            --sphere-base-saturation: 8%;
+            --sphere-base-lightness-min: 10%;
+            --sphere-base-lightness-max: 30%;
+        }
+        
+        [data-theme="dark"] {
+            --sphere-base-hue: 30;
+            --sphere-base-saturation: 8%;
+            --sphere-base-lightness-min: 70%;
+            --sphere-base-lightness-max: 95%;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1918;
+            color: white;
+        }
+        
+        .sphere {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 5px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Programmatic Color Generation Test</h1>
+    <button onclick="toggleTheme()">Toggle Theme</button>
+    <button onclick="generateColors()">Generate Colors</button>
+    <div id="spheres"></div>
+    
+    <script>
+        function generateSphereColor(index, totalSpheres) {
+            const lightnessVariation = (index / totalSpheres) * 20;
+            const hueVariation = (index * 137.5) % 60;
+            
+            return `hsl(
+                calc(var(--sphere-base-hue) + ${hueVariation}deg),
+                var(--sphere-base-saturation),
+                calc(var(--sphere-base-lightness-min) + ${lightnessVariation}%)
+            )`;
+        }
+        
+        function generateColors() {
+            const container = document.getElementById('spheres');
+            container.innerHTML = '';
+            
+            for (let i = 1; i <= 36; i++) {
+                const sphere = document.createElement('div');
+                sphere.className = 'sphere';
+                sphere.style.backgroundColor = generateSphereColor(i, 36);
+                sphere.title = `Sphere ${i}`;
+                container.appendChild(sphere);
+            }
+        }
+        
+        function toggleTheme() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            generateColors(); // Regenerate to see the change
+        }
+        
+        // Initialize
+        document.documentElement.setAttribute('data-theme', 'dark');
+        generateColors();
+    </script>
+</body>
+</html>

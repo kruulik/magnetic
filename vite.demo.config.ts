@@ -12,5 +12,10 @@ export default defineConfig({
     alias: {
       '../src': '../src'
     }
+  },
+  css: {
+    modules: {
+      localsConvention: 'camelCase'
+    }
   }
 })

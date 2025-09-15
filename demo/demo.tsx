@@ -1,20 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useMagnetic } from '../src/index';
+import { SingleSphereDemo } from './components/SingleSphereDemo';
+import { MultiSphereDemo } from './components/MultiSphereDemo';
+import { LavaSphereDemo } from './components/LavaSphereDemo';
+import { MorphSphereDemo } from './components/MorphSphereDemo';
+import './styles/globals.scss';
+import styles from './styles/Demo.module.scss';
+
+type DemoType = 'single' | 'multi' | 'lava' | 'morph';
 
 const Demo: React.FC = () => {
-  const [strength, setStrength] = useState(0.3);
+  const [demoType, setDemoType] = useState<DemoType>('lava');
+  const [strength, setStrength] = useState(2);
   const [distance, setDistance] = useState(100);
   const [duration, setDuration] = useState(0.4);
   const [ease, setEase] = useState('power2.out');
+  const [fullWindow, setFullWindow] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const magneticRef = useMagnetic<HTMLDivElement>({
-    strength,
-    distance,
-    duration,
-    ease,
-    debug: false
-  });
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldUseDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+    
+    setIsDarkMode(shouldUseDark);
+    document.documentElement.setAttribute('data-theme', shouldUseDark ? 'dark' : 'light');
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    const themeValue = newTheme ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', themeValue);
+    localStorage.setItem('theme', themeValue);
+  };
 
   const easeOptions = [
     'power1.out',
@@ -26,94 +46,172 @@ const Demo: React.FC = () => {
   ];
 
   return (
-    <div className="demo-container">
-      <div className="sphere-container">
-        <div
-          ref={magneticRef}
-          style={{
-            width: '150px',
-            height: '150px',
-            backgroundColor: '#2f2e2c',
-            borderRadius: '50%',
-            cursor: 'pointer',
-          }}
-        />
-      </div>
+    <>
+      <h1 className={styles.title}>Magnetic Components Demo</h1>
+      <button className={styles.themeToggle} onClick={toggleTheme}>
+        {isDarkMode ? '☀️ Light' : '🌙 Dark'}
+      </button>
       
-      <div className="controls">
-        <h3 style={{ marginTop: 0, marginBottom: 20, fontSize: '1.1rem' }}>Magnetic Parameters</h3>
-        
-        <div className="control-group">
-          <label>Attraction Strength</label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-            Controls how strongly the element is pulled toward the cursor.
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="2"
-            step="0.1"
-            value={strength}
-            onChange={(e) => setStrength(parseFloat(e.target.value))}
+      <div className={styles.container}>
+        {demoType === 'single' ? (
+          <SingleSphereDemo
+            strength={strength}
+            distance={distance}
+            duration={duration}
+            ease={ease}
+            fullWindow={fullWindow}
+            showTooltip={showTooltip}
           />
-          <div className="control-value">{strength}</div>
-        </div>
-
-        <div className="control-group">
-          <label>Magnetic Field Range</label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-            The distance from the element where magnetic attraction begins.
-          </div>
-          <input
-            type="range"
-            min="50"
-            max="500"
-            step="10"
-            value={distance}
-            onChange={(e) => setDistance(parseInt(e.target.value))}
+        ) : demoType === 'multi' ? (
+          <MultiSphereDemo
+            strength={strength}
+            distance={distance}
+            duration={duration}
+            ease={ease}
+            fullWindow={fullWindow}
+            showTooltip={showTooltip}
           />
-          <div className="control-value">{distance}px</div>
-        </div>
-
-        <div className="control-group">
-          <label>Animation Duration</label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-            How long it takes for the element to return to center when cursor leaves.
-          </div>
-          <input
-            type="range"
-            min="0.1"
-            max="1"
-            step="0.1"
-            value={duration}
-            onChange={(e) => setDuration(parseFloat(e.target.value))}
+        ) : demoType === 'morph' ? (
+          <MorphSphereDemo
+            strength={strength}
+            distance={distance}
+            duration={duration}
+            ease={ease}
+            fullWindow={fullWindow}
+            showTooltip={showTooltip}
           />
-          <div className="control-value">{duration}s</div>
-        </div>
+        ) : (
+          <LavaSphereDemo
+            strength={strength}
+            distance={distance}
+            duration={duration}
+            ease={ease}
+            fullWindow={fullWindow}
+            showTooltip={showTooltip}
+          />
+        )}
 
-        <div className="control-group">
-          <label>Animation Easing</label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
-            The animation curve used for the return-to-center movement.
+        <div className={styles.controls}>
+          <h3 className={styles.controlsTitle}>Demo Controls</h3>
+
+          <div className={styles.controlGroup}>
+            <label>Demo Type</label>
+            <select
+              value={demoType}
+              onChange={(e) => setDemoType(e.target.value as DemoType)}
+            >
+              <option value="single">Single Sphere + Physics</option>
+              <option value="multi">36 Spheres Field</option>
+              <option value="lava">Lava Sphere Morphing</option>
+              <option value="morph">GSAP MorphSVG Demo</option>
+            </select>
           </div>
-          <select
-            value={ease}
-            onChange={(e) => setEase(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #2f2e2c',
-              background: '#fefefd',
-              color: '#2f2e2c'
-            }}
-          >
-            {easeOptions.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
+
+          <div className={styles.demoInfo}>
+            {demoType === 'single' ? (
+              <div>
+                <strong>Single Sphere Demo:</strong><br />
+                Interactive physics visualization with one magnetic sphere and detailed force calculations.
+              </div>
+            ) : demoType === 'multi' ? (
+              <div>
+                <strong>Multi-Sphere Demo:</strong><br />
+                36 spheres of varying sizes distributed across a 3x height scrollable field, each responding independently to cursor movement.
+              </div>
+            ) : demoType === 'morph' ? (
+              <div>
+                <strong>GSAP MorphSVG Demo:</strong><br />
+                A ferrofluid-like sphere using GSAP MorphSVG to transition between predefined shapes, eliminating pinching through shape morphing rather than individual point calculations.
+              </div>
+            ) : (
+              <div>
+                <strong>Lava Sphere Demo:</strong><br />
+                A ferrofluid-like sphere that morphs and stretches toward your cursor, creating organic liquid-like deformations with controllable pointiness.
+              </div>
+            )}
+          </div>
+
+          <h4 className={styles.parametersTitle}>Magnetic Parameters</h4>
+
+          <div className={styles.controlGroup}>
+            <label>Attraction Strength</label>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={strength}
+              onChange={(e) => setStrength(parseFloat(e.target.value))}
+            />
+            <div className={styles.controlValue}>{strength}</div>
+          </div>
+
+          <div className={styles.controlGroup}>
+            <label>
+              <input
+                type="checkbox"
+                checked={fullWindow}
+                onChange={(e) => setFullWindow(e.target.checked)}
+              />
+              Full Window Range
+            </label>
+          </div>
+
+          <div className={styles.controlGroup}>
+            <label>Magnetic Field Range</label>
+            <input
+              type="range"
+              min="50"
+              max="2000"
+              step="10"
+              value={distance}
+              disabled={fullWindow}
+              onChange={(e) => setDistance(parseInt(e.target.value))}
+              style={{ opacity: fullWindow ? 0.5 : 1 }}
+            />
+            <div className={styles.controlValue} style={{ opacity: fullWindow ? 0.5 : 1 }}>
+              {fullWindow ? 'Full Window' : `${distance}px`}
+            </div>
+          </div>
+
+          <div className={styles.controlGroup}>
+            <label>Animation Duration</label>
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.1"
+              value={duration}
+              onChange={(e) => setDuration(parseFloat(e.target.value))}
+            />
+            <div className={styles.controlValue}>{duration}s</div>
+          </div>
+
+          <div className={styles.controlGroup}>
+            <label>
+              <input
+                type="checkbox"
+                checked={showTooltip}
+                onChange={(e) => setShowTooltip(e.target.checked)}
+              />
+              Show Debug Tooltip
+            </label>
+          </div>
+
+          <div className={styles.controlGroup}>
+            <label>Animation Easing</label>
+            <select
+              value={ease}
+              onChange={(e) => setEase(e.target.value)}
+            >
+              {easeOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -1,0 +1,95 @@
+// CSS Custom Properties for theming
+:root {
+  // Light theme colors
+  --bg-primary: #fefefd;
+  --bg-secondary: #f8f8f7;
+  --bg-tertiary: rgba(255, 255, 255, 0.9);
+  --text-primary: #2f2e2c;
+  --text-secondary: #666;
+  --text-tertiary: #888;
+  --border-primary: #2f2e2c;
+  --border-secondary: #e0e0df;
+  --border-tertiary: #ccc;
+  --sphere-primary: #2f2e2c;
+  --sphere-secondary: #4a4845;
+  --accent-blue: #007bff;
+  --tooltip-bg: rgba(0, 123, 255, 0.95);
+  --tooltip-inactive: rgba(128, 128, 128, 0.95);
+  --shadow: rgba(0, 0, 0, 0.2);
+  
+  // Base colors for programmatic sphere generation
+  --sphere-base-hue: 30;
+  --sphere-base-saturation: 8%;
+  --sphere-base-lightness-min: 10%;
+  --sphere-base-lightness-max: 30%;
+}
+
+// Dark theme colors
+[data-theme="dark"] {
+  --bg-primary: #1a1918;
+  --bg-secondary: #242322;
+  --bg-tertiary: rgba(26, 25, 24, 0.9);
+  --text-primary: #e8e6e3;
+  --text-secondary: #b8b6b3;
+  --text-tertiary: #9a9896;
+  --border-primary: #e8e6e3;
+  --border-secondary: #3a3938;
+  --border-tertiary: #4a4845;
+  --sphere-primary: #e8e6e3;
+  --sphere-secondary: #b8b6b3;
+  --accent-blue: #4a9eff;
+  --tooltip-bg: rgba(74, 158, 255, 0.95);
+  --tooltip-inactive: rgba(184, 182, 179, 0.95);
+  --shadow: rgba(0, 0, 0, 0.4);
+  
+  // Base colors for programmatic sphere generation (dark theme)
+  --sphere-base-hue: 30;
+  --sphere-base-saturation: 8%;
+  --sphere-base-lightness-min: 70%;
+  --sphere-base-lightness-max: 95%;
+}
+
+// Global styles
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 40px;
+  background: var(--bg-primary);
+  min-height: 100vh;
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  margin: 0;
+}
+h1 {
+  margin-right: 300px;
+}
+
+input, select, button {
+  font-family: inherit;
+}
+
+// Scrollbar styling for dark mode
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-tertiary);
+}
