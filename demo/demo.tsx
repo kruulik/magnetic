@@ -4,19 +4,20 @@ import { SingleSphereDemo } from './components/SingleSphereDemo';
 import { MultiSphereDemo } from './components/MultiSphereDemo';
 import { LavaSphereDemo } from './components/LavaSphereDemo';
 import { MultiLavaSphereDemo } from './components/MultiLavaSphereDemo';
+import { MagneticLavaRectangleDemo } from './components/MagneticLavaRectangleDemo';
 import './styles/globals.scss';
 import styles from './styles/Demo.module.scss';
 
-type DemoType = 'single' | 'multi' | 'lava' | 'multi-lava';
+type DemoType = 'single' | 'multi' | 'lava' | 'multi-lava' | 'magnetic-rectangle';
 
 const Demo: React.FC = () => {
-  const [demoType, setDemoType] = useState<DemoType>('multi-lava');
+  const [demoType, setDemoType] = useState<DemoType>('magnetic-rectangle');
   const [strength, setStrength] = useState(2);
   const [distance, setDistance] = useState(100);
   const [duration, setDuration] = useState(0.4);
   const [ease, setEase] = useState('power2.out');
-  const [fullWindow, setFullWindow] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(true);
+  const [fullWindow, setFullWindow] = useState(true);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Physics parameters for LavaSphereDemo
@@ -31,6 +32,13 @@ const Demo: React.FC = () => {
   const [forceCurveExponent, setForceCurveExponent] = useState(2.5);
   const [minDampeningFactor, setMinDampeningFactor] = useState(0.15);
   const [perceivedCursorOffset, setPerceivedCursorOffset] = useState(30);
+
+  // Rectangle-specific parameters
+  const [activeSides, setActiveSides] = useState<Array<'top' | 'right' | 'bottom' | 'left'>>(['right']);
+  const [rectangleWidth, setRectangleWidth] = useState(200);
+  const [rectangleHeight, setRectangleHeight] = useState(400);
+  const [pointsPerSide, setPointsPerSide] = useState(8);
+  const [cornerDeflectionFactor, setCornerDeflectionFactor] = useState(0.2);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -92,6 +100,35 @@ const Demo: React.FC = () => {
             fullWindow={fullWindow}
             showTooltip={showTooltip}
           />
+        ) : demoType === 'magnetic-rectangle' ? (
+          <MagneticLavaRectangleDemo
+            strength={strength}
+            distance={distance}
+            duration={duration}
+            ease={ease}
+            fullWindow={fullWindow}
+            showTooltip={showTooltip}
+            activeSides={activeSides}
+            width={rectangleWidth}
+            height={rectangleHeight}
+            pointsPerSide={pointsPerSide}
+            onCursorInside={(isInside) => {
+              // Optional: could add visual feedback here
+              console.log('Cursor inside rectangle:', isInside);
+            }}
+            attractionMultiplier={attractionMultiplier}
+            pointinessFactor={pointinessFactor}
+            minDistance={minDistance}
+            surfaceBuffer={surfaceBuffer}
+            stretchFactor={stretchFactor}
+            pointinessMultiplier={pointinessMultiplier}
+            smoothingFactor={smoothingFactor}
+            dampeningPower={dampeningPower}
+            forceCurveExponent={forceCurveExponent}
+            minDampeningFactor={minDampeningFactor}
+            perceivedCursorOffset={perceivedCursorOffset}
+            cornerDeflectionFactor={cornerDeflectionFactor}
+          />
         ) : (
           <LavaSphereDemo
             strength={strength}
@@ -127,6 +164,7 @@ const Demo: React.FC = () => {
               <option value="multi">36 Spheres Field</option>
               <option value="lava">Lava Sphere Morphing</option>
               <option value="multi-lava">Multi-Lava Sphere Field</option>
+              <option value="magnetic-rectangle">Magnetic Lava Rectangle</option>
             </select>
           </div>
 
@@ -146,6 +184,11 @@ const Demo: React.FC = () => {
                 <strong>Multi-Lava Sphere Demo:</strong><br />
                 36 ferrofluid-like spheres of varying sizes and colors that morph and stretch toward your cursor. Each sphere responds independently with realistic lava-like deformation physics.
               </div>
+            ) : demoType === 'magnetic-rectangle' ? (
+              <div>
+                <strong>Magnetic Lava Rectangle Demo:</strong><br />
+                A rectangular shape with configurable magnetic sides. Only selected sides respond to cursor attraction, creating localized bulges while maintaining straight edges on inactive sides. Changes color when cursor enters the shape.
+              </div>
             ) : (
               <div>
                 <strong>Lava Sphere Demo:</strong><br />
@@ -161,7 +204,7 @@ const Demo: React.FC = () => {
             <input
               type="range"
               min="0"
-              max="2"
+              max="10"
               step="0.1"
               value={strength}
               onChange={(e) => setStrength(parseFloat(e.target.value))}
@@ -372,13 +415,149 @@ const Demo: React.FC = () => {
                 <label>Perceived Cursor Offset</label>
                 <input
                   type="range"
-                  min="10"
-                  max="60"
+                  min="0"
+                  max="100"
                   step="5"
                   value={perceivedCursorOffset}
                   onChange={(e) => setPerceivedCursorOffset(parseInt(e.target.value))}
                 />
                 <div className={styles.controlValue}>{perceivedCursorOffset}px</div>
+              </div>
+
+            </>
+          )}
+
+          {/* Rectangle Controls for Magnetic Rectangle Demo */}
+          {demoType === 'magnetic-rectangle' && (
+            <>
+              <h4 className={styles.parametersTitle}>Rectangle Configuration</h4>
+              
+              <div className={styles.controlGroup}>
+                <label>Active Sides</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                  {(['top', 'right', 'bottom', 'left'] as const).map(side => (
+                    <label key={side} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={activeSides.includes(side)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setActiveSides([...activeSides, side]);
+                          } else {
+                            setActiveSides(activeSides.filter(s => s !== side));
+                          }
+                        }}
+                      />
+                      <span style={{ textTransform: 'capitalize' }}>{side}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Rectangle Width</label>
+                <input
+                  type="range"
+                  min="150"
+                  max="350"
+                  step="25"
+                  value={rectangleWidth}
+                  onChange={(e) => setRectangleWidth(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{rectangleWidth}px</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Rectangle Height</label>
+                <input
+                  type="range"
+                  min="200"
+                  max="500"
+                  step="25"
+                  value={rectangleHeight}
+                  onChange={(e) => setRectangleHeight(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{rectangleHeight}px</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Points Per Side</label>
+                <input
+                  type="range"
+                  min="4"
+                  max="20"
+                  step="2"
+                  value={pointsPerSide}
+                  onChange={(e) => setPointsPerSide(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{pointsPerSide}</div>
+              </div>
+
+              <h4 className={styles.parametersTitle}>Rectangle Physics Parameters</h4>
+              
+              <div className={styles.controlGroup}>
+                <label>Attraction Multiplier</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="50"
+                  step="1"
+                  value={attractionMultiplier}
+                  onChange={(e) => setAttractionMultiplier(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{attractionMultiplier}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Pointiness Factor</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={pointinessFactor}
+                  onChange={(e) => setPointinessFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{pointinessFactor}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Stretch Factor</label>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="1.5"
+                  step="0.1"
+                  value={stretchFactor}
+                  onChange={(e) => setStretchFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{stretchFactor}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Perceived Cursor Offset</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={perceivedCursorOffset}
+                  onChange={(e) => setPerceivedCursorOffset(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{perceivedCursorOffset}px</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Corner Deflection Factor</label>
+                <input
+                  type="range"
+                  min="0.0"
+                  max="1.0"
+                  step="0.1"
+                  value={cornerDeflectionFactor}
+                  onChange={(e) => setCornerDeflectionFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{cornerDeflectionFactor}</div>
               </div>
             </>
           )}
