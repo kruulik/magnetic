@@ -1,7 +1,8 @@
 .container {
   display: flex;
-  min-height: calc(100vh - 120px);
+  min-height: 100vh;
   margin-right: 300px;
+  padding: 30px;
 }
 
 .content {

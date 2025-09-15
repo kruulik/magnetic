@@ -10,7 +10,142 @@ interface LavaSphereDemoProps {
   fullWindow: boolean;
   showTooltip: boolean;
   numPoints?: number;
+  // New configurable physics parameters
+  attractionMultiplier?: number;
+  pointinessFactor?: number;
+  minDistance?: number;
+  surfaceBuffer?: number;
+  stretchFactor?: number;
+  pointinessMultiplier?: number;
+  smoothingFactor?: number;
+  dampeningPower?: number;
+  forceCurveExponent?: number;
+  minDampeningFactor?: number;
+  perceivedCursorOffset?: number;
 }
+
+// Physics configuration with sensible defaults
+interface PhysicsConfig {
+  baseRadius: number;
+  attractionMultiplier: number;
+  pointinessFactor: number;
+  minDistance: number;
+  surfaceBuffer: number;
+  stretchFactor: number;
+  pointinessMultiplier: number;
+  smoothingFactor: number;
+  dampeningPower: number;
+  forceCurveExponent: number;
+  minDampeningFactor: number;
+  perceivedCursorOffset: number;
+  svgSize: number;
+  screenToSvgRatio: number;
+  maxPointiness: number;
+  closeDampeningThreshold: number;
+  tipActivationThreshold: number;
+  maxTipFactor: number;
+  pointyReductionAmount: number;
+}
+
+// Default physics configuration
+const DEFAULT_PHYSICS: PhysicsConfig = {
+  baseRadius: 150,
+  attractionMultiplier: 30,
+  pointinessFactor: 0.5,
+  minDistance: 20,
+  surfaceBuffer: 60,
+  stretchFactor: 0.6,
+  pointinessMultiplier: 1.2,
+  smoothingFactor: 0.4,
+  dampeningPower: 0.6,
+  forceCurveExponent: 2.5,
+  minDampeningFactor: 0.15,
+  perceivedCursorOffset: 30,
+  svgSize: 600,
+  screenToSvgRatio: 600 / 400,
+  maxPointiness: 0.6,
+  closeDampeningThreshold: 2,
+  tipActivationThreshold: 0.6,
+  maxTipFactor: 1,
+  pointyReductionAmount: 15
+};
+
+// Additional constants for UI and behavior
+const UI_CONSTANTS = {
+  cursorIndicatorSize: 4,
+  tooltipOffset: { x: 15, y: 10 },
+  farAwayDistance: 1000,
+  durationMultiplier: 0.3,
+  pointinessStrengthFactor: 0.8,
+  minCloseDampeningFactor: 0.2
+};
+
+// Coordinate system utilities
+const CoordinateUtils = {
+  screenToSvg: (screenCoord: number, screenCenter: number, svgCenter: number, ratio: number): number => {
+    return (screenCoord - screenCenter) * ratio + svgCenter;
+  },
+  
+  svgToScreen: (svgCoord: number, svgCenter: number, screenCenter: number, ratio: number): number => {
+    return (svgCoord - svgCenter) / ratio + screenCenter;
+  }
+};
+
+// Distance and direction calculations
+const VectorUtils = {
+  calculateDistance: (x1: number, y1: number, x2: number, y2: number): number => {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+  },
+  
+  normalizeVector: (x: number, y: number): { x: number; y: number; length: number } => {
+    const length = Math.sqrt(x * x + y * y);
+    return {
+      x: length > 0 ? x / length : 0,
+      y: length > 0 ? y / length : 0,
+      length
+    };
+  },
+  
+  calculateAngle: (x: number, y: number): number => {
+    return Math.atan2(y, x);
+  }
+};
+
+// Physics calculations
+const PhysicsUtils = {
+  calculateBaseMagneticForce: (distance: number, effectiveDistance: number, config: PhysicsConfig): number => {
+    const normalizedDistance = distance / effectiveDistance;
+    return Math.pow(1 - Math.min(normalizedDistance, 1), config.forceCurveExponent);
+  },
+  
+  calculateGlobalDampening: (distance: number, config: PhysicsConfig): number => {
+    const sphereRadius = config.baseRadius * (400 / config.svgSize);
+    
+    if (distance < sphereRadius + config.surfaceBuffer) {
+      const distanceFromSurface = Math.max(distance - sphereRadius, 0);
+      const dampeningFactor = Math.max(distanceFromSurface / config.surfaceBuffer, config.minDampeningFactor);
+      return Math.pow(dampeningFactor, config.dampeningPower);
+    }
+    
+    return 1.0;
+  },
+  
+  calculateCloseDampening: (rawDistance: number, config: PhysicsConfig): number => {
+    if (rawDistance < config.minDistance * config.closeDampeningThreshold) {
+      return Math.max(rawDistance / (config.minDistance * config.closeDampeningThreshold), UI_CONSTANTS.minCloseDampeningFactor);
+    }
+    return 1.0;
+  },
+  
+  calculatePointiness: (magneticForce: number, strength: number, rawDistance: number, config: PhysicsConfig): number => {
+    if (magneticForce > config.tipActivationThreshold && rawDistance > config.minDistance) {
+      const tipFactor = Math.min((magneticForce - config.tipActivationThreshold) / (1 - config.tipActivationThreshold), config.maxTipFactor);
+      const pointiness = Math.min(magneticForce * strength * UI_CONSTANTS.pointinessStrengthFactor, config.maxPointiness);
+      return pointiness * tipFactor * config.pointinessFactor;
+    }
+    return 0;
+  }
+};
 
 export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
   strength,
@@ -19,7 +154,19 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
   ease,
   fullWindow,
   showTooltip,
-  numPoints = 136
+  numPoints = 136,
+  // Physics parameters with defaults from DEFAULT_PHYSICS
+  attractionMultiplier = DEFAULT_PHYSICS.attractionMultiplier,
+  pointinessFactor = DEFAULT_PHYSICS.pointinessFactor,
+  minDistance = DEFAULT_PHYSICS.minDistance,
+  surfaceBuffer = DEFAULT_PHYSICS.surfaceBuffer,
+  stretchFactor = DEFAULT_PHYSICS.stretchFactor,
+  pointinessMultiplier = DEFAULT_PHYSICS.pointinessMultiplier,
+  smoothingFactor = DEFAULT_PHYSICS.smoothingFactor,
+  dampeningPower = DEFAULT_PHYSICS.dampeningPower,
+  forceCurveExponent = DEFAULT_PHYSICS.forceCurveExponent,
+  minDampeningFactor = DEFAULT_PHYSICS.minDampeningFactor,
+  perceivedCursorOffset = DEFAULT_PHYSICS.perceivedCursorOffset
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -36,7 +183,21 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
     active: boolean;
   } | null>(null);
 
-  const baseRadius = 150;
+  // Create physics config from props
+  const physicsConfig: PhysicsConfig = {
+    ...DEFAULT_PHYSICS,
+    attractionMultiplier,
+    pointinessFactor,
+    minDistance,
+    surfaceBuffer,
+    stretchFactor,
+    pointinessMultiplier,
+    smoothingFactor,
+    dampeningPower,
+    forceCurveExponent,
+    minDampeningFactor,
+    perceivedCursorOffset
+  };
 
   // Calculate perceived cursor position that's always offset farther from sphere center
   const calculatePerceivedCursor = (
@@ -44,27 +205,24 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
     actualMouseY: number,
     sphereCenterX: number,
     sphereCenterY: number,
-    offsetDistance: number = 20
+    offsetDistance: number = physicsConfig.perceivedCursorOffset
   ) => {
     const directionX = actualMouseX - sphereCenterX;
     const directionY = actualMouseY - sphereCenterY;
     
-    // Calculate the distance from actual cursor to sphere center
-    const distance = Math.sqrt(directionX * directionX + directionY * directionY);
+    const distance = VectorUtils.calculateDistance(actualMouseX, actualMouseY, sphereCenterX, sphereCenterY);
     
     // If cursor is at center, return a slight offset to avoid division by zero
     if (distance === 0) {
       return { x: sphereCenterX + offsetDistance, y: sphereCenterY };
     }
     
-    // Normalize direction vector
-    const normalizedX = directionX / distance;
-    const normalizedY = directionY / distance;
+    const normalized = VectorUtils.normalizeVector(directionX, directionY);
     
     // Calculate perceived position (actual distance + offset)
     const perceivedDistance = distance + offsetDistance;
-    const perceivedX = sphereCenterX + normalizedX * perceivedDistance;
-    const perceivedY = sphereCenterY + normalizedY * perceivedDistance;
+    const perceivedX = sphereCenterX + normalized.x * perceivedDistance;
+    const perceivedY = sphereCenterY + normalized.y * perceivedDistance;
     
     return { x: perceivedX, y: perceivedY };
   };
@@ -80,88 +238,58 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
     svgCenterY: number,
     numPoints: number = 32
   ) => {
-    // Optimized constants to prevent pinching
-    const ATTRACTION_MULTIPLIER = 25; // Reduced from 40 to prevent extreme forces
-    const POINTINESS_FACTOR = 0.08;   // Reduced from 0.15 for gentler pointiness
-    const MIN_DISTANCE = 20;          // Minimum distance to prevent extreme forces
-    const SURFACE_BUFFER = 60;        // Distance from surface where dampening begins
-    
     const points: { x: number; y: number }[] = [];
     
-    // Convert cursor position to SVG coordinates
-    const cursorSvgX = (mouseX - sphereCenterX) * (600/400) + svgCenterX;
-    const cursorSvgY = (mouseY - sphereCenterY) * (600/400) + svgCenterY;
+    // Convert cursor position to SVG coordinates using utility
+    const cursorSvgX = CoordinateUtils.screenToSvg(mouseX, sphereCenterX, svgCenterX, physicsConfig.screenToSvgRatio);
+    const cursorSvgY = CoordinateUtils.screenToSvg(mouseY, sphereCenterY, svgCenterY, physicsConfig.screenToSvgRatio);
     
     // Calculate distance from cursor to sphere center for global dampening
-    const centerDistance = Math.sqrt(
-      Math.pow(mouseX - sphereCenterX, 2) + Math.pow(mouseY - sphereCenterY, 2)
-    );
+    const centerDistance = VectorUtils.calculateDistance(mouseX, mouseY, sphereCenterX, sphereCenterY);
     
-    // Global dampening when cursor gets too close to sphere
-    const sphereRadius = baseRadius * (400/600); // Convert to screen coordinates
-    let globalDampening = 1.0;
-    
-    if (centerDistance < sphereRadius + SURFACE_BUFFER) {
-      // Apply progressive dampening as cursor approaches surface
-      const distanceFromSurface = Math.max(centerDistance - sphereRadius, 0);
-      const dampeningFactor = Math.max(distanceFromSurface / SURFACE_BUFFER, 0.15); // Minimum 15% force
-      globalDampening = Math.pow(dampeningFactor, 0.6); // Gentler curve
-    }
+    // Apply global dampening using utility function
+    const globalDampening = PhysicsUtils.calculateGlobalDampening(centerDistance, physicsConfig);
     
     for (let i = 0; i < numPoints; i++) {
       const angle = (i / numPoints) * Math.PI * 2;
       
       // Start with base circle position
-      const baseX = svgCenterX + Math.cos(angle) * baseRadius;
-      const baseY = svgCenterY + Math.sin(angle) * baseRadius;
+      const baseX = svgCenterX + Math.cos(angle) * physicsConfig.baseRadius;
+      const baseY = svgCenterY + Math.sin(angle) * physicsConfig.baseRadius;
       
       // Calculate this point's position in screen coordinates for distance calculation
-      const pointScreenX = sphereCenterX + Math.cos(angle) * baseRadius * (400/600);
-      const pointScreenY = sphereCenterY + Math.sin(angle) * baseRadius * (400/600);
+      const pointScreenX = sphereCenterX + Math.cos(angle) * physicsConfig.baseRadius * (400/600);
+      const pointScreenY = sphereCenterY + Math.sin(angle) * physicsConfig.baseRadius * (400/600);
       
       // Calculate distance to cursor with minimum distance protection
-      const rawPointDistance = Math.sqrt(
-        Math.pow(mouseX - pointScreenX, 2) + Math.pow(mouseY - pointScreenY, 2)
-      );
-      const pointDistanceToMouse = Math.max(rawPointDistance, MIN_DISTANCE);
+      const rawPointDistance = VectorUtils.calculateDistance(mouseX, mouseY, pointScreenX, pointScreenY);
+      const pointDistanceToMouse = Math.max(rawPointDistance, physicsConfig.minDistance);
       
-      // Calculate magnetic force with smoother falloff
-      const normalizedDistance = pointDistanceToMouse / effectiveDistance;
-      const baseMagneticForce = Math.pow(1 - Math.min(normalizedDistance, 1), 2.5); // Gentler curve
+      // Calculate magnetic force using utility function
+      const baseMagneticForce = PhysicsUtils.calculateBaseMagneticForce(pointDistanceToMouse, effectiveDistance, physicsConfig);
       
       // Apply global dampening to prevent pinching
       const pointMagneticForce = baseMagneticForce * globalDampening;
       
-      // Calculate attraction vector toward cursor
-      const directionToCursorX = cursorSvgX - baseX;
-      const directionToCursorY = cursorSvgY - baseY;
-      const directionLength = Math.sqrt(directionToCursorX * directionToCursorX + directionToCursorY * directionToCursorY);
-      
-      // Normalize direction vector
-      const normalizedDirectionX = directionLength > 0 ? directionToCursorX / directionLength : 0;
-      const normalizedDirectionY = directionLength > 0 ? directionToCursorY / directionLength : 0;
+      // Calculate attraction vector toward cursor using utility
+      const directionToCursor = VectorUtils.normalizeVector(cursorSvgX - baseX, cursorSvgY - baseY);
       
       // Calculate attraction strength with progressive dampening
-      let attractionStrength = pointMagneticForce * strength * ATTRACTION_MULTIPLIER;
+      let attractionStrength = pointMagneticForce * strength * physicsConfig.attractionMultiplier;
       
-      // Additional dampening for very close points to prevent extreme stretching
-      if (rawPointDistance < MIN_DISTANCE * 2) {
-        const closeDampening = Math.max(rawPointDistance / (MIN_DISTANCE * 2), 0.2);
-        attractionStrength *= closeDampening;
-      }
+      // Additional dampening for very close points using utility function
+      const closeDampening = PhysicsUtils.calculateCloseDampening(rawPointDistance, physicsConfig);
+      attractionStrength *= closeDampening;
       
       // Move point toward cursor
-      let x = baseX + normalizedDirectionX * attractionStrength;
-      let y = baseY + normalizedDirectionY * attractionStrength;
+      let x = baseX + directionToCursor.x * attractionStrength;
+      let y = baseY + directionToCursor.y * attractionStrength;
       
-      // Add gentle pointiness for closest points only
-      if (pointMagneticForce > 0.6 && rawPointDistance > MIN_DISTANCE) {
-        const tipFactor = Math.min((pointMagneticForce - 0.6) / 0.4, 1);
-        const pointiness = Math.min(pointMagneticForce * strength * 0.8, 0.6); // Reduced intensity
-        const pointyReduction = pointiness * tipFactor * POINTINESS_FACTOR;
-        
-        x += normalizedDirectionX * pointyReduction * 15; // Reduced from 20
-        y += normalizedDirectionY * pointyReduction * 15;
+      // Add pointiness for closest points using utility function
+      const pointinessAmount = PhysicsUtils.calculatePointiness(pointMagneticForce, strength, rawPointDistance, physicsConfig);
+      if (pointinessAmount > 0) {
+        x += directionToCursor.x * pointinessAmount * physicsConfig.pointyReductionAmount;
+        y += directionToCursor.y * pointinessAmount * physicsConfig.pointyReductionAmount;
       }
       
       points.push({ x, y });
@@ -173,8 +301,6 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
     let path = `M ${points[0].x},${points[0].y}`;
     
     // Calculate smooth control points for each segment using cubic Bézier
-    const SMOOTHING_FACTOR = 0.4; // How much curve vs straight line
-    
     for (let i = 0; i < points.length; i++) {
       const current = points[i];
       const next = points[(i + 1) % points.length];
@@ -192,12 +318,12 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
         y: nextNext.y - current.y
       };
       
-      // Control points for cubic Bézier curve
-      const cp1x = current.x + (prevToNext.x * SMOOTHING_FACTOR);
-      const cp1y = current.y + (prevToNext.y * SMOOTHING_FACTOR);
+      // Control points for cubic Bézier curve using configurable smoothing factor
+      const cp1x = current.x + (prevToNext.x * physicsConfig.smoothingFactor);
+      const cp1y = current.y + (prevToNext.y * physicsConfig.smoothingFactor);
       
-      const cp2x = next.x - (currentToNextNext.x * SMOOTHING_FACTOR);
-      const cp2y = next.y - (currentToNextNext.y * SMOOTHING_FACTOR);
+      const cp2x = next.x - (currentToNextNext.x * physicsConfig.smoothingFactor);
+      const cp2y = next.y - (currentToNextNext.y * physicsConfig.smoothingFactor);
       
       // Create cubic Bézier curve to next point
       path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${next.x},${next.y}`;
@@ -210,11 +336,6 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
   const calculateMagneticEffect = (mouseX: number, mouseY: number) => {
     if (!containerRef.current || !svgRef.current) return;
     
-    // Parameters aligned with generateLavaPath
-    const STRETCH_FACTOR = 0.4;            // Reduced to match new gentler approach
-    const POINTINESS_MULTIPLIER = 0.8;     // Reduced for gentler pointiness
-    const SURFACE_BUFFER = 60;             // Match generateLavaPath buffer
-    
     // Calculate SVG-specific center coordinates
     const svgRect = svgRef.current.getBoundingClientRect();
     const sphereCenterX = svgRect.left + svgRect.width / 2;
@@ -225,17 +346,13 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
     const svgCenterX = svgViewBox.width / 2;
     const svgCenterY = svgViewBox.height / 2;
     
-    // Calculate both actual and perceived cursor positions
-    const actualDistance = Math.sqrt(
-      Math.pow(mouseX - sphereCenterX, 2) + Math.pow(mouseY - sphereCenterY, 2)
-    );
+    // Calculate both actual and perceived cursor positions using utility functions
+    const actualDistance = VectorUtils.calculateDistance(mouseX, mouseY, sphereCenterX, sphereCenterY);
     
-    const perceivedCursor = calculatePerceivedCursor(mouseX, mouseY, sphereCenterX, sphereCenterY, 30);
+    const perceivedCursor = calculatePerceivedCursor(mouseX, mouseY, sphereCenterX, sphereCenterY);
     setPerceivedMousePos(perceivedCursor);
     
-    const perceivedDistance = Math.sqrt(
-      Math.pow(perceivedCursor.x - sphereCenterX, 2) + Math.pow(perceivedCursor.y - sphereCenterY, 2)
-    );
+    const perceivedDistance = VectorUtils.calculateDistance(perceivedCursor.x, perceivedCursor.y, sphereCenterX, sphereCenterY);
 
     const effectiveDistance = fullWindow 
       ? Math.max(sphereCenterX, window.innerWidth - sphereCenterX, sphereCenterY, window.innerHeight - sphereCenterY)
@@ -248,25 +365,18 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
       // Use perceived cursor position for all magnetic calculations
       const directionX = perceivedCursor.x - sphereCenterX;
       const directionY = perceivedCursor.y - sphereCenterY;
-      const angle = Math.atan2(directionY, directionX);
+      const angle = VectorUtils.calculateAngle(directionX, directionY);
       
-      const normalizedDistance = perceivedDistance / effectiveDistance;
-      const baseMagneticForce = Math.pow(1 - Math.min(normalizedDistance, 1), 2.5); // Match generateLavaPath curve
+      // Calculate magnetic force using utility functions
+      const baseMagneticForce = PhysicsUtils.calculateBaseMagneticForce(perceivedDistance, effectiveDistance, physicsConfig);
       
-      // Apply same global dampening logic as generateLavaPath using perceived distance
-      const sphereRadius = baseRadius * (400/600);
-      let globalDampening = 1.0;
-      
-      if (perceivedDistance < sphereRadius + SURFACE_BUFFER) {
-        const distanceFromSurface = Math.max(perceivedDistance - sphereRadius, 0);
-        const dampeningFactor = Math.max(distanceFromSurface / SURFACE_BUFFER, 0.15);
-        globalDampening = Math.pow(dampeningFactor, 0.6);
-      }
+      // Apply global dampening using utility function
+      const globalDampening = PhysicsUtils.calculateGlobalDampening(perceivedDistance, physicsConfig);
       
       const magneticForce = baseMagneticForce * globalDampening;
       
-      const stretchAmount = magneticForce * strength * STRETCH_FACTOR;
-      const pointiness = Math.min(magneticForce * strength * POINTINESS_MULTIPLIER, 0.6); // Cap at 0.6
+      const stretchAmount = magneticForce * strength * physicsConfig.stretchFactor;
+      const pointiness = Math.min(magneticForce * strength * physicsConfig.pointinessMultiplier, physicsConfig.maxPointiness);
       
       // Use perceived cursor position for path generation
       const newPath = generateLavaPath(
@@ -284,7 +394,7 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
       if (pathRef.current) {
         gsap.to(pathRef.current, {
           attr: { d: newPath },
-          duration: duration * 0.3,
+          duration: duration * UI_CONSTANTS.durationMultiplier,
           ease: ease
         });
       }
@@ -301,8 +411,8 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
     } else {
       // For inactive state, pass dummy values that result in base circle
       const circlePath = generateLavaPath(
-        sphereCenterX + 1000, // Far away cursor position
-        sphereCenterY + 1000, 
+        sphereCenterX + UI_CONSTANTS.farAwayDistance,
+        sphereCenterY + UI_CONSTANTS.farAwayDistance, 
         sphereCenterX, 
         sphereCenterY, 
         0, // No strength
@@ -338,12 +448,25 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
 
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
       calculateMagneticEffect(e.clientX, e.clientY);
     };
 
+    const handleScroll = () => {
+      // Recalculate with current mouse position when scroll happens
+      calculateMagneticEffect(mousePos.x, mousePos.y);
+    };
+
     document.addEventListener('mousemove', handleGlobalMouseMove);
-    return () => document.removeEventListener('mousemove', handleGlobalMouseMove);
-  }, [strength, distance, duration, ease, fullWindow]);
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [strength, distance, duration, ease, fullWindow, mousePos.x, mousePos.y]);
 
   useEffect(() => {
     if (pathRef.current && svgRef.current) {
@@ -354,12 +477,12 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
       
       // Initialize with no magnetic force (far away cursor)
       const initialPath = generateLavaPath(
-        svgCenterX + 1000, // Far away cursor position
-        svgCenterY + 1000,
+        svgCenterX + UI_CONSTANTS.farAwayDistance,
+        svgCenterY + UI_CONSTANTS.farAwayDistance,
         svgCenterX, // Dummy sphere center for initialization
         svgCenterY,
         0, // No strength
-        1000, // Dummy effective distance
+        UI_CONSTANTS.farAwayDistance, // Dummy effective distance
         svgCenterX, 
         svgCenterY,
         numPoints
@@ -385,29 +508,26 @@ export const LavaSphereDemo: React.FC<LavaSphereDemoProps> = ({
           />
         </svg>
         
-        {/* Red dot indicator for perceived cursor position */}
-        {debugInfo?.active && (
+        {/* Red dot indicator for perceived cursor position - only show when debug tooltip is enabled */}
+        {debugInfo?.active && showTooltip && (
           <div
             className={styles.perceivedCursor}
             style={{
-              left: perceivedMousePos.x - 4,
-              top: perceivedMousePos.y - 4,
+              left: perceivedMousePos.x - UI_CONSTANTS.cursorIndicatorSize,
+              top: perceivedMousePos.y - UI_CONSTANTS.cursorIndicatorSize,
             }}
           />
         )}
         
-        <div className={styles.description}>
-          <h3>Lava Sphere Demo</h3>
-          <p>A ferrofluid-like sphere that morphs and stretches toward your cursor using magnetic physics.</p>
-        </div>
+       
       </div>
 
       {showTooltip && debugInfo && (
         <div 
           className={`${styles.tooltip} ${!debugInfo.active ? styles.inactive : ''}`}
           style={{
-            left: mousePos.x + 15,
-            top: mousePos.y - 10,
+            left: mousePos.x + UI_CONSTANTS.tooltipOffset.x,
+            top: mousePos.y - UI_CONSTANTS.tooltipOffset.y,
           }}
         >
           <div className={styles.tooltipDistance}>Actual Distance: <strong>{debugInfo.distance.toFixed(1)}px</strong></div>

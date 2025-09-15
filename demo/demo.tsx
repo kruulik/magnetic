@@ -3,20 +3,34 @@ import { createRoot } from 'react-dom/client';
 import { SingleSphereDemo } from './components/SingleSphereDemo';
 import { MultiSphereDemo } from './components/MultiSphereDemo';
 import { LavaSphereDemo } from './components/LavaSphereDemo';
+import { MultiLavaSphereDemo } from './components/MultiLavaSphereDemo';
 import './styles/globals.scss';
 import styles from './styles/Demo.module.scss';
 
-type DemoType = 'single' | 'multi' | 'lava' | 'morph';
+type DemoType = 'single' | 'multi' | 'lava' | 'multi-lava';
 
 const Demo: React.FC = () => {
-  const [demoType, setDemoType] = useState<DemoType>('lava');
+  const [demoType, setDemoType] = useState<DemoType>('multi-lava');
   const [strength, setStrength] = useState(2);
   const [distance, setDistance] = useState(100);
   const [duration, setDuration] = useState(0.4);
   const [ease, setEase] = useState('power2.out');
   const [fullWindow, setFullWindow] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // Physics parameters for LavaSphereDemo
+  const [attractionMultiplier, setAttractionMultiplier] = useState(30);
+  const [pointinessFactor, setPointinessFactor] = useState(0.5);
+  const [minDistance, setMinDistance] = useState(20);
+  const [surfaceBuffer, setSurfaceBuffer] = useState(60);
+  const [stretchFactor, setStretchFactor] = useState(0.6);
+  const [pointinessMultiplier, setPointinessMultiplier] = useState(1.2);
+  const [smoothingFactor, setSmoothingFactor] = useState(0.4);
+  const [dampeningPower, setDampeningPower] = useState(0.6);
+  const [forceCurveExponent, setForceCurveExponent] = useState(2.5);
+  const [minDampeningFactor, setMinDampeningFactor] = useState(0.15);
+  const [perceivedCursorOffset, setPerceivedCursorOffset] = useState(30);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -46,7 +60,6 @@ const Demo: React.FC = () => {
 
   return (
     <>
-      <h1 className={styles.title}>Magnetic Components Demo</h1>
       <button className={styles.themeToggle} onClick={toggleTheme}>
         {isDarkMode ? '☀️ Light' : '🌙 Dark'}
       </button>
@@ -70,6 +83,15 @@ const Demo: React.FC = () => {
             fullWindow={fullWindow}
             showTooltip={showTooltip}
           />
+        ) : demoType === 'multi-lava' ? (
+          <MultiLavaSphereDemo
+            strength={strength}
+            distance={distance}
+            duration={duration}
+            ease={ease}
+            fullWindow={fullWindow}
+            showTooltip={showTooltip}
+          />
         ) : (
           <LavaSphereDemo
             strength={strength}
@@ -78,6 +100,17 @@ const Demo: React.FC = () => {
             ease={ease}
             fullWindow={fullWindow}
             showTooltip={showTooltip}
+            attractionMultiplier={attractionMultiplier}
+            pointinessFactor={pointinessFactor}
+            minDistance={minDistance}
+            surfaceBuffer={surfaceBuffer}
+            stretchFactor={stretchFactor}
+            pointinessMultiplier={pointinessMultiplier}
+            smoothingFactor={smoothingFactor}
+            dampeningPower={dampeningPower}
+            forceCurveExponent={forceCurveExponent}
+            minDampeningFactor={minDampeningFactor}
+            perceivedCursorOffset={perceivedCursorOffset}
           />
         )}
 
@@ -93,7 +126,7 @@ const Demo: React.FC = () => {
               <option value="single">Single Sphere + Physics</option>
               <option value="multi">36 Spheres Field</option>
               <option value="lava">Lava Sphere Morphing</option>
-              <option value="morph">GSAP MorphSVG Demo</option>
+              <option value="multi-lava">Multi-Lava Sphere Field</option>
             </select>
           </div>
 
@@ -108,10 +141,10 @@ const Demo: React.FC = () => {
                 <strong>Multi-Sphere Demo:</strong><br />
                 36 spheres of varying sizes distributed across a 3x height scrollable field, each responding independently to cursor movement.
               </div>
-            ) : demoType === 'morph' ? (
+            ) : demoType === 'multi-lava' ? (
               <div>
-                <strong>GSAP MorphSVG Demo:</strong><br />
-                A ferrofluid-like sphere using GSAP MorphSVG to transition between predefined shapes, eliminating pinching through shape morphing rather than individual point calculations.
+                <strong>Multi-Lava Sphere Demo:</strong><br />
+                36 ferrofluid-like spheres of varying sizes and colors that morph and stretch toward your cursor. Each sphere responds independently with realistic lava-like deformation physics.
               </div>
             ) : (
               <div>
@@ -199,6 +232,156 @@ const Demo: React.FC = () => {
               ))}
             </select>
           </div>
+
+          {/* Physics Controls for Lava Sphere Demo */}
+          {demoType === 'lava' && (
+            <>
+              <h4 className={styles.parametersTitle}>Lava Physics Parameters</h4>
+              
+              <div className={styles.controlGroup}>
+                <label>Attraction Multiplier</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="50"
+                  step="1"
+                  value={attractionMultiplier}
+                  onChange={(e) => setAttractionMultiplier(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{attractionMultiplier}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Pointiness Factor</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={pointinessFactor}
+                  onChange={(e) => setPointinessFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{pointinessFactor}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Stretch Factor</label>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="1.5"
+                  step="0.1"
+                  value={stretchFactor}
+                  onChange={(e) => setStretchFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{stretchFactor}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Pointiness Multiplier</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.1"
+                  value={pointinessMultiplier}
+                  onChange={(e) => setPointinessMultiplier(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{pointinessMultiplier}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Smoothing Factor</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="0.8"
+                  step="0.1"
+                  value={smoothingFactor}
+                  onChange={(e) => setSmoothingFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{smoothingFactor}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Surface Buffer</label>
+                <input
+                  type="range"
+                  min="20"
+                  max="120"
+                  step="10"
+                  value={surfaceBuffer}
+                  onChange={(e) => setSurfaceBuffer(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{surfaceBuffer}px</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Minimum Distance</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="50"
+                  step="5"
+                  value={minDistance}
+                  onChange={(e) => setMinDistance(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{minDistance}px</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Dampening Power</label>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="1.2"
+                  step="0.1"
+                  value={dampeningPower}
+                  onChange={(e) => setDampeningPower(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{dampeningPower}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Force Curve Exponent</label>
+                <input
+                  type="range"
+                  min="1.5"
+                  max="4.0"
+                  step="0.1"
+                  value={forceCurveExponent}
+                  onChange={(e) => setForceCurveExponent(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{forceCurveExponent}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Min Dampening Factor</label>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="0.3"
+                  step="0.05"
+                  value={minDampeningFactor}
+                  onChange={(e) => setMinDampeningFactor(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{minDampeningFactor}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Perceived Cursor Offset</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="60"
+                  step="5"
+                  value={perceivedCursorOffset}
+                  onChange={(e) => setPerceivedCursorOffset(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{perceivedCursorOffset}px</div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>
