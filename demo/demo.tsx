@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { SingleSphereDemo } from './components/SingleSphereDemo';
 import { MultiSphereDemo } from './components/MultiSphereDemo';
 import { LavaSphereDemo } from './components/LavaSphereDemo';
-import { MorphSphereDemo } from './components/MorphSphereDemo';
 import './styles/globals.scss';
 import styles from './styles/Demo.module.scss';
 
@@ -64,15 +63,6 @@ const Demo: React.FC = () => {
           />
         ) : demoType === 'multi' ? (
           <MultiSphereDemo
-            strength={strength}
-            distance={distance}
-            duration={duration}
-            ease={ease}
-            fullWindow={fullWindow}
-            showTooltip={showTooltip}
-          />
-        ) : demoType === 'morph' ? (
-          <MorphSphereDemo
             strength={strength}
             distance={distance}
             duration={duration}
