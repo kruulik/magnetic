@@ -7,6 +7,15 @@
   justify-content: center;
 }
 
+.constrainedContainer {
+  position: relative;
+  background: rgba(34, 211, 238, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
 .rectangleContainer {
   position: relative;
   width: 100%;
@@ -16,6 +25,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
 }
 
 .magneticRectangle {

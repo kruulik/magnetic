@@ -5,13 +5,14 @@ import { MultiSphereDemo } from './components/MultiSphereDemo';
 import { LavaSphereDemo } from './components/LavaSphereDemo';
 import { MultiLavaSphereDemo } from './components/MultiLavaSphereDemo';
 import { MagneticLavaRectangleDemo } from './components/MagneticLavaRectangleDemo';
+import { SidebarMorphDemo } from './components/SidebarMorphDemo';
 import './styles/globals.scss';
 import styles from './styles/Demo.module.scss';
 
-type DemoType = 'single' | 'multi' | 'lava' | 'multi-lava' | 'magnetic-rectangle';
+type DemoType = 'single' | 'multi' | 'lava' | 'multi-lava' | 'magnetic-rectangle' | 'sidebar-morph';
 
 const Demo: React.FC = () => {
-  const [demoType, setDemoType] = useState<DemoType>('magnetic-rectangle');
+  const [demoType, setDemoType] = useState<DemoType>('sidebar-morph');
   const [strength, setStrength] = useState(2);
   const [distance, setDistance] = useState(100);
   const [duration, setDuration] = useState(0.4);
@@ -34,7 +35,7 @@ const Demo: React.FC = () => {
   const [perceivedCursorOffset, setPerceivedCursorOffset] = useState(30);
 
   // Rectangle-specific parameters
-  const [activeSides, setActiveSides] = useState<Array<'top' | 'right' | 'bottom' | 'left'>>(['right']);
+  const [activeSides, setActiveSides] = useState<Array<'top' | 'right' | 'bottom' | 'left'>>(['right', 'bottom']);
   const [rectangleWidth, setRectangleWidth] = useState(200);
   const [rectangleHeight, setRectangleHeight] = useState(400);
   const [pointsPerSide, setPointsPerSide] = useState(8);
@@ -68,6 +69,9 @@ const Demo: React.FC = () => {
 
   return (
     <>
+      {/* Render SidebarMorphDemo outside the main container so it can overlay everything */}
+      {demoType === 'sidebar-morph' && <SidebarMorphDemo />}
+      
       <button className={styles.themeToggle} onClick={toggleTheme}>
         {isDarkMode ? '☀️ Light' : '🌙 Dark'}
       </button>
@@ -100,6 +104,24 @@ const Demo: React.FC = () => {
             fullWindow={fullWindow}
             showTooltip={showTooltip}
           />
+        ) : demoType === 'sidebar-morph' ? (
+          // Sidebar demo is rendered outside, show placeholder content here
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            height: '60vh',
+            fontSize: '18px',
+            color: 'var(--text-color)',
+            textAlign: 'center',
+            lineHeight: 1.6
+          }}>
+            <div>
+              <h2>Sidebar Morph Demo Active</h2>
+              <p>Look at the left edge of your screen!<br />
+              Hover over it to see the morphing sidebar expand.</p>
+            </div>
+          </div>
         ) : demoType === 'magnetic-rectangle' ? (
           <MagneticLavaRectangleDemo
             strength={strength}
@@ -165,6 +187,7 @@ const Demo: React.FC = () => {
               <option value="lava">Lava Sphere Morphing</option>
               <option value="multi-lava">Multi-Lava Sphere Field</option>
               <option value="magnetic-rectangle">Magnetic Lava Rectangle</option>
+              <option value="sidebar-morph">Sidebar Morph Demo</option>
             </select>
           </div>
 
@@ -188,6 +211,11 @@ const Demo: React.FC = () => {
               <div>
                 <strong>Magnetic Lava Rectangle Demo:</strong><br />
                 A rectangular shape with configurable magnetic sides. Only selected sides respond to cursor attraction, creating localized bulges while maintaining straight edges on inactive sides. Changes color when cursor enters the shape.
+              </div>
+            ) : demoType === 'sidebar-morph' ? (
+              <div>
+                <strong>Sidebar Morph Demo:</strong><br />
+                A black/white sidebar on the left edge that morphs to cover the entire screen when you hover over it. The GSAP animation smoothly expands from a 50px wide sidebar to fullscreen coverage. Click anywhere to contract back to sidebar form.
               </div>
             ) : (
               <div>
