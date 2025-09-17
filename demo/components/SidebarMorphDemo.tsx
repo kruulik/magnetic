@@ -5,7 +5,6 @@ import styles from '../styles/SidebarMorphDemo.module.scss';
 
 interface SidebarMorphDemoProps {
   strength?: number;
-  attractionMultiplier?: number;
   stretchFactor?: number;
   forceCurveExponent?: number;
   dampeningPower?: number;
@@ -17,8 +16,7 @@ interface SidebarMorphDemoProps {
 }
 
 export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
-  strength = 8,
-  attractionMultiplier = 200,
+  strength = 240, // Increased from 8 to 240 (8 * 30) to compensate for removed attractionMultiplier
   stretchFactor = 3.0,
   forceCurveExponent = 0.3,
   dampeningPower = 0.1,
@@ -132,7 +130,6 @@ export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
           pointsPerSide={20}
           fill={sidebarColor}
           onCursorInside={isExpanded ? undefined : handleCursorInside}
-          attractionMultiplier={isExpanded ? 0 : attractionMultiplier}
           pointinessFactor={0.1}
           minDistance={0}
           surfaceBuffer={surfaceBuffer}

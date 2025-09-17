@@ -13,7 +13,7 @@ type DemoType = 'single' | 'multi' | 'lava' | 'multi-lava' | 'magnetic-rectangle
 
 const Demo: React.FC = () => {
   const [demoType, setDemoType] = useState<DemoType>('sidebar-morph');
-  const [strength, setStrength] = useState(2);
+  const [strength, setStrength] = useState(60); // Increased from 2 to 60 (2 * 30) to compensate for removed attractionMultiplier
   const [distance, setDistance] = useState(100);
   const [duration, setDuration] = useState(0.4);
   const [ease, setEase] = useState('power2.out');
@@ -39,6 +39,12 @@ const Demo: React.FC = () => {
   const [cursorFieldRadius, setCursorFieldRadius] = useState(30);
   const [fieldGrowthFactor, setFieldGrowthFactor] = useState(0.5);
   const [deformationMode, setDeformationMode] = useState<'cursor' | 'surface-normal'>('surface-normal');
+
+  // Bulge calculation parameters
+  const [optimalDistanceMultiplier, setOptimalDistanceMultiplier] = useState(2.5);
+  const [maxBulgeSafetyMargin, setMaxBulgeSafetyMargin] = useState(0.8);
+  const [maxExpansionCap, setMaxExpansionCap] = useState(40);
+  const [minExpansionFloor, setMinExpansionFloor] = useState(15);
 
   // Rectangle-specific parameters
   const [activeSides, setActiveSides] = useState<Array<'top' | 'right' | 'bottom' | 'left'>>(['right', 'bottom']);
@@ -79,7 +85,6 @@ const Demo: React.FC = () => {
       {demoType === 'sidebar-morph' && (
         <SidebarMorphDemo
           strength={strength}
-          attractionMultiplier={attractionMultiplier}
           stretchFactor={stretchFactor}
           forceCurveExponent={forceCurveExponent}
           dampeningPower={dampeningPower}
@@ -157,7 +162,6 @@ const Demo: React.FC = () => {
               // Optional: could add visual feedback here
               console.log('Cursor inside rectangle:', isInside);
             }}
-            attractionMultiplier={attractionMultiplier}
             pointinessFactor={pointinessFactor}
             minDistance={minDistance}
             surfaceBuffer={surfaceBuffer}
@@ -175,6 +179,10 @@ const Demo: React.FC = () => {
             cursorFieldRadius={cursorFieldRadius}
             fieldGrowthFactor={fieldGrowthFactor}
             deformationMode={deformationMode}
+            optimalDistanceMultiplier={optimalDistanceMultiplier}
+            maxBulgeSafetyMargin={maxBulgeSafetyMargin}
+            maxExpansionCap={maxExpansionCap}
+            minExpansionFloor={minExpansionFloor}
           />
         ) : (
           <LavaSphereDemo
@@ -257,8 +265,8 @@ const Demo: React.FC = () => {
             <input
               type="range"
               min="0"
-              max="10"
-              step="0.1"
+              max="100"
+              step="1"
               value={strength}
               onChange={(e) => setStrength(parseFloat(e.target.value))}
             />
@@ -333,19 +341,6 @@ const Demo: React.FC = () => {
           {demoType === 'lava' && (
             <>
               <h4 className={styles.parametersTitle}>Lava Physics Parameters</h4>
-              
-              <div className={styles.controlGroup}>
-                <label>Attraction Multiplier</label>
-                <input
-                  type="range"
-                  min="10"
-                  max="50"
-                  step="1"
-                  value={attractionMultiplier}
-                  onChange={(e) => setAttractionMultiplier(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{attractionMultiplier}</div>
-              </div>
 
               <div className={styles.controlGroup}>
                 <label>Pointiness Factor</label>
@@ -557,19 +552,6 @@ const Demo: React.FC = () => {
                   <option value="surface-normal">Surface Normal (Organic Bulges)</option>
                   <option value="cursor">Cursor Direction (Angular Waves)</option>
                 </select>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Attraction Multiplier</label>
-                <input
-                  type="range"
-                  min="10"
-                  max="50"
-                  step="1"
-                  value={attractionMultiplier}
-                  onChange={(e) => setAttractionMultiplier(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{attractionMultiplier}</div>
               </div>
 
               <div className={styles.controlGroup}>
@@ -785,6 +767,60 @@ const Demo: React.FC = () => {
                   </div>
                 </>
               )}
+
+              <h4 className={styles.parametersTitle}>Bulge Calculation Parameters</h4>
+              
+              <div className={styles.controlGroup}>
+                <label>Optimal Distance Multiplier</label>
+                <input
+                  type="range"
+                  min="1.0"
+                  max="5.0"
+                  step="0.1"
+                  value={optimalDistanceMultiplier}
+                  onChange={(e) => setOptimalDistanceMultiplier(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{optimalDistanceMultiplier}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Max Bulge Safety Margin</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.05"
+                  value={maxBulgeSafetyMargin}
+                  onChange={(e) => setMaxBulgeSafetyMargin(parseFloat(e.target.value))}
+                />
+                <div className={styles.controlValue}>{maxBulgeSafetyMargin}</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Max Expansion Cap</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  step="5"
+                  value={maxExpansionCap}
+                  onChange={(e) => setMaxExpansionCap(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{maxExpansionCap}px</div>
+              </div>
+
+              <div className={styles.controlGroup}>
+                <label>Min Expansion Floor</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  step="1"
+                  value={minExpansionFloor}
+                  onChange={(e) => setMinExpansionFloor(parseInt(e.target.value))}
+                />
+                <div className={styles.controlValue}>{minExpansionFloor}px</div>
+              </div>
             </>
           )}
 
@@ -802,19 +838,6 @@ const Demo: React.FC = () => {
                   <option value="surface-normal">Surface Normal (Organic Bulges)</option>
                   <option value="cursor">Cursor Direction (Angular Waves)</option>
                 </select>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Attraction Multiplier</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="500"
-                  step="10"
-                  value={attractionMultiplier}
-                  onChange={(e) => setAttractionMultiplier(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{attractionMultiplier}</div>
               </div>
 
               <div className={styles.controlGroup}>

@@ -26,7 +26,6 @@ export interface MagneticLavaRectangleProps {
   onMouseMove?: (e: MouseEvent) => void;
 
   // Physics parameters
-  attractionMultiplier?: number;
   pointinessFactor?: number;
   minDistance?: number;
   surfaceBuffer?: number;
@@ -45,13 +44,18 @@ export interface MagneticLavaRectangleProps {
   cursorFieldRadius?: number;
   fieldGrowthFactor?: number;
   deformationMode?: 'cursor' | 'surface-normal';
+  
+  // Bulge calculation parameters
+  optimalDistanceMultiplier?: number;
+  maxBulgeSafetyMargin?: number;
+  maxExpansionCap?: number;
+  minExpansionFloor?: number;
 }
 
 // Physics configuration interface
 interface PhysicsConfig {
   width: number;
   height: number;
-  attractionMultiplier: number;
   pointinessFactor: number;
   minDistance: number;
   surfaceBuffer: number;
@@ -70,11 +74,14 @@ interface PhysicsConfig {
   maxTipFactor: number;
   pointyReductionAmount: number;
   magneticDistribution: number;
+  optimalDistanceMultiplier: number;
+  maxBulgeSafetyMargin: number;
+  maxExpansionCap: number;
+  minExpansionFloor: number;
 }
 
 // Default physics configuration
 const DEFAULT_PHYSICS: Omit<PhysicsConfig, 'width' | 'height'> = {
-  attractionMultiplier: 25,
   pointinessFactor: 0.3,
   minDistance: 25,
   surfaceBuffer: 80,
@@ -92,7 +99,11 @@ const DEFAULT_PHYSICS: Omit<PhysicsConfig, 'width' | 'height'> = {
   tipActivationThreshold: 0.7,
   maxTipFactor: 0.8,
   pointyReductionAmount: 10,
-  magneticDistribution: 1.0
+  magneticDistribution: 1.0,
+  optimalDistanceMultiplier: 2.5,
+  maxBulgeSafetyMargin: 0.8,
+  maxExpansionCap: 40,
+  minExpansionFloor: 15
 };
 
 // Constants
@@ -240,25 +251,24 @@ const PhysicsUtils = {
 
   // Calculate maximum possible magnetic bulge radius for viewBox expansion
   calculateMaxBulgeRadius: (strength: number, distance: number, config: PhysicsConfig): number => {
-    // Maximum magnetic force occurs at optimal distance (typically around minDistance * 2-3)
-    const optimalDistance = config.minDistance * 2.5;
+    // Maximum magnetic force occurs at optimal distance (configurable multiplier)
+    const optimalDistance = config.minDistance * config.optimalDistanceMultiplier;
     const maxMagneticForce = PhysicsUtils.calculateBaseMagneticForce(optimalDistance, distance, config);
     const maxGlobalDampening = PhysicsUtils.calculateGlobalDampening(optimalDistance, config);
     const maxCloseDampening = PhysicsUtils.calculateCloseDampening(optimalDistance, config, UI_CONSTANTS.minCloseDampeningFactor);
 
     // Calculate maximum attraction strength
-    const maxAttractionStrength = maxMagneticForce * maxGlobalDampening * maxCloseDampening *
-      strength * config.attractionMultiplier;
+    const maxAttractionStrength = maxMagneticForce * maxGlobalDampening * maxCloseDampening * strength;
 
     // Add maximum pointiness contribution
     const maxPointiness = PhysicsUtils.calculatePointiness(maxMagneticForce, strength, optimalDistance, config);
     const maxPointinessContribution = maxPointiness * config.pointyReductionAmount;
 
-    // Total maximum bulge radius (with reduced safety margin)
-    const maxBulge = (maxAttractionStrength + maxPointinessContribution) * 0.8; // Reduced expansion
+    // Total maximum bulge radius (with configurable safety margin)
+    const maxBulge = (maxAttractionStrength + maxPointinessContribution) * config.maxBulgeSafetyMargin;
 
-    // Ensure minimum expansion for visibility, but keep it reasonable
-    return Math.max(Math.min(maxBulge, 40), 15); // Cap at 40px expansion, minimum 15px
+    // Ensure minimum/maximum expansion bounds (configurable)
+    return Math.max(Math.min(maxBulge, config.maxExpansionCap), config.minExpansionFloor);
   }
 };
 
@@ -288,7 +298,6 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
   onCursorInside,
   onMouseMove,
   // Physics parameters with defaults
-  attractionMultiplier = DEFAULT_PHYSICS.attractionMultiplier,
   pointinessFactor = DEFAULT_PHYSICS.pointinessFactor,
   minDistance = DEFAULT_PHYSICS.minDistance,
   surfaceBuffer = DEFAULT_PHYSICS.surfaceBuffer,
@@ -306,7 +315,12 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
   minCloseDampeningFactor = UI_CONSTANTS.minCloseDampeningFactor,
   cursorFieldRadius = 30,
   fieldGrowthFactor = 0.5,
-  deformationMode = 'surface-normal'
+  deformationMode = 'surface-normal',
+  // Bulge calculation parameters with defaults
+  optimalDistanceMultiplier = DEFAULT_PHYSICS.optimalDistanceMultiplier,
+  maxBulgeSafetyMargin = DEFAULT_PHYSICS.maxBulgeSafetyMargin,
+  maxExpansionCap = DEFAULT_PHYSICS.maxExpansionCap,
+  minExpansionFloor = DEFAULT_PHYSICS.minExpansionFloor
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -420,7 +434,6 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
     ...DEFAULT_PHYSICS,
     width,
     height,
-    attractionMultiplier,
     pointinessFactor,
     minDistance,
     surfaceBuffer,
@@ -433,7 +446,11 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
     perceivedCursorOffset,
     svgPadding,
     magneticDistribution,
-    closeDampeningThreshold
+    closeDampeningThreshold,
+    optimalDistanceMultiplier,
+    maxBulgeSafetyMargin,
+    maxExpansionCap,
+    minExpansionFloor
   };
 
   // Generate rectangle points
@@ -658,7 +675,7 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
       const baseMagneticForce = PhysicsUtils.calculateBaseMagneticForce(pointDistanceToMouse, effectiveDistance, physicsConfig);
       const pointMagneticForce = baseMagneticForce * globalDampening;
 
-      let attractionStrength = pointMagneticForce * strength * physicsConfig.attractionMultiplier;
+      let attractionStrength = pointMagneticForce * strength;
       const closeDampening = PhysicsUtils.calculateCloseDampening(rawPointDistance, physicsConfig, minCloseDampeningFactor);
       attractionStrength *= closeDampening;
 

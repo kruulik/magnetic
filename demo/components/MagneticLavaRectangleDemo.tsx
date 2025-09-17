@@ -22,7 +22,6 @@ interface MagneticLavaRectangleDemoProps {
   hoverColor?: string;
   
   // Physics parameters
-  attractionMultiplier?: number;
   pointinessFactor?: number;
   minDistance?: number;
   surfaceBuffer?: number;
@@ -40,6 +39,12 @@ interface MagneticLavaRectangleDemoProps {
   cursorFieldRadius?: number;
   fieldGrowthFactor?: number;
   deformationMode?: 'cursor' | 'surface-normal';
+  
+  // Bulge calculation parameters
+  optimalDistanceMultiplier?: number;
+  maxBulgeSafetyMargin?: number;
+  maxExpansionCap?: number;
+  minExpansionFloor?: number;
 }
 
 // Demo-specific constants
@@ -63,7 +68,6 @@ export const MagneticLavaRectangleDemo: React.FC<MagneticLavaRectangleDemoProps>
   baseColor = '#3b3ec0ff',
   hoverColor = '#ef4444',
   // Physics parameters
-  attractionMultiplier,
   pointinessFactor,
   minDistance,
   surfaceBuffer,
@@ -80,7 +84,12 @@ export const MagneticLavaRectangleDemo: React.FC<MagneticLavaRectangleDemoProps>
   minCloseDampeningFactor,
   cursorFieldRadius,
   fieldGrowthFactor,
-  deformationMode
+  deformationMode,
+  // Bulge calculation parameters
+  optimalDistanceMultiplier,
+  maxBulgeSafetyMargin,
+  maxExpansionCap,
+  minExpansionFloor
 }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [perceivedMousePos, setPerceivedMousePos] = useState({ x: 0, y: 0 });
@@ -142,7 +151,6 @@ export const MagneticLavaRectangleDemo: React.FC<MagneticLavaRectangleDemoProps>
           fullWindow={fullWindow}
           onCursorInside={handleCursorInside}
           onMouseMove={handleMouseMove}
-          attractionMultiplier={attractionMultiplier}
           pointinessFactor={pointinessFactor}
           minDistance={minDistance}
           surfaceBuffer={surfaceBuffer}
@@ -160,6 +168,10 @@ export const MagneticLavaRectangleDemo: React.FC<MagneticLavaRectangleDemoProps>
           cursorFieldRadius={cursorFieldRadius}
           fieldGrowthFactor={fieldGrowthFactor}
           deformationMode={deformationMode}
+          optimalDistanceMultiplier={optimalDistanceMultiplier}
+          maxBulgeSafetyMargin={maxBulgeSafetyMargin}
+          maxExpansionCap={maxExpansionCap}
+          minExpansionFloor={minExpansionFloor}
           svgPadding={0}
           className={styles.magneticRectangle}
         />
