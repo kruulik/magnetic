@@ -39,6 +39,12 @@ export interface MagneticLavaRectangleProps {
   perceivedCursorOffset?: number;
   cornerDeflectionFactor?: number;
   svgPadding?: number;
+  magneticDistribution?: number;
+  closeDampeningThreshold?: number;
+  minCloseDampeningFactor?: number;
+  cursorFieldRadius?: number;
+  fieldGrowthFactor?: number;
+  deformationMode?: 'cursor' | 'surface-normal';
 }
 
 // Physics configuration interface
@@ -63,6 +69,7 @@ interface PhysicsConfig {
   tipActivationThreshold: number;
   maxTipFactor: number;
   pointyReductionAmount: number;
+  magneticDistribution: number;
 }
 
 // Default physics configuration
@@ -84,7 +91,8 @@ const DEFAULT_PHYSICS: Omit<PhysicsConfig, 'width' | 'height'> = {
   closeDampeningThreshold: 3.5,
   tipActivationThreshold: 0.7,
   maxTipFactor: 0.8,
-  pointyReductionAmount: 10
+  pointyReductionAmount: 10,
+  magneticDistribution: 1.0
 };
 
 // Constants
@@ -108,6 +116,78 @@ const VectorUtils = {
       y: length > 0 ? y / length : 0,
       length
     };
+  },
+
+  // Calculate surface normal for a point based on its side and position
+  calculateSurfaceNormal: (point: RectPoint, isCorner: boolean): { x: number; y: number } => {
+    if (isCorner) {
+      // For corners, blend the normals of adjacent sides
+      let normalX = 0;
+      let normalY = 0;
+      
+      switch (point.side) {
+        case 'top':
+          if (point.sidePosition === 0) {
+            // Top-left corner
+            normalX = -0.707; // Left component
+            normalY = -0.707; // Top component
+          } else {
+            // Top-right corner
+            normalX = 0.707;  // Right component
+            normalY = -0.707; // Top component
+          }
+          break;
+        case 'right':
+          if (point.sidePosition === 0) {
+            // Top-right corner (already handled above, but for completeness)
+            normalX = 0.707;
+            normalY = -0.707;
+          } else {
+            // Bottom-right corner
+            normalX = 0.707;
+            normalY = 0.707;
+          }
+          break;
+        case 'bottom':
+          if (point.sidePosition === 0) {
+            // Bottom-right corner
+            normalX = 0.707;
+            normalY = 0.707;
+          } else {
+            // Bottom-left corner
+            normalX = -0.707;
+            normalY = 0.707;
+          }
+          break;
+        case 'left':
+          if (point.sidePosition === 0) {
+            // Bottom-left corner
+            normalX = -0.707;
+            normalY = 0.707;
+          } else {
+            // Top-left corner
+            normalX = -0.707;
+            normalY = -0.707;
+          }
+          break;
+      }
+      
+      return { x: normalX, y: normalY };
+    } else {
+      // For edge points, use pure directional normals
+      switch (point.side) {
+        case 'top':
+          return { x: 0, y: -1 }; // Point upward
+        case 'right':
+          return { x: 1, y: 0 };  // Point rightward
+        case 'bottom':
+          return { x: 0, y: 1 };  // Point downward
+        case 'left':
+          return { x: -1, y: 0 }; // Point leftward
+        default:
+          return { x: 0, y: 0 };
+      }
+    }
   }
 };
 
@@ -120,7 +200,18 @@ const CoordinateUtils = {
 const PhysicsUtils = {
   calculateBaseMagneticForce: (distance: number, effectiveDistance: number, config: PhysicsConfig): number => {
     const normalizedDistance = distance / effectiveDistance;
-    return Math.pow(1 - Math.min(normalizedDistance, 1), config.forceCurveExponent);
+    const baseForce = Math.pow(1 - Math.min(normalizedDistance, 1), config.forceCurveExponent);
+    
+    // Apply magnetic distribution curve
+    // Lower values (0.5-0.9) create sharper, more pin-like attraction
+    // Higher values (1.1-3.0) create wider, bell curve-like bulges
+    if (config.magneticDistribution !== 1.0) {
+      // Create a distribution modifier that affects how the force spreads
+      const distributionCurve = Math.pow(baseForce, 1 / config.magneticDistribution);
+      return distributionCurve;
+    }
+    
+    return baseForce;
   },
 
   calculateGlobalDampening: (distance: number, config: PhysicsConfig): number => {
@@ -131,9 +222,9 @@ const PhysicsUtils = {
     return 1.0;
   },
 
-  calculateCloseDampening: (rawDistance: number, config: PhysicsConfig): number => {
+  calculateCloseDampening: (rawDistance: number, config: PhysicsConfig, minCloseDampeningFactor: number): number => {
     if (rawDistance < config.minDistance * config.closeDampeningThreshold) {
-      return Math.max(rawDistance / (config.minDistance * config.closeDampeningThreshold), UI_CONSTANTS.minCloseDampeningFactor);
+      return Math.max(rawDistance / (config.minDistance * config.closeDampeningThreshold), minCloseDampeningFactor);
     }
     return 1.0;
   },
@@ -153,7 +244,7 @@ const PhysicsUtils = {
     const optimalDistance = config.minDistance * 2.5;
     const maxMagneticForce = PhysicsUtils.calculateBaseMagneticForce(optimalDistance, distance, config);
     const maxGlobalDampening = PhysicsUtils.calculateGlobalDampening(optimalDistance, config);
-    const maxCloseDampening = PhysicsUtils.calculateCloseDampening(optimalDistance, config);
+    const maxCloseDampening = PhysicsUtils.calculateCloseDampening(optimalDistance, config, UI_CONSTANTS.minCloseDampeningFactor);
 
     // Calculate maximum attraction strength
     const maxAttractionStrength = maxMagneticForce * maxGlobalDampening * maxCloseDampening *
@@ -209,7 +300,13 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
   minDampeningFactor = DEFAULT_PHYSICS.minDampeningFactor,
   perceivedCursorOffset = DEFAULT_PHYSICS.perceivedCursorOffset,
   cornerDeflectionFactor = 0.2,
-  svgPadding = DEFAULT_PHYSICS.svgPadding
+  svgPadding = DEFAULT_PHYSICS.svgPadding,
+  magneticDistribution = DEFAULT_PHYSICS.magneticDistribution,
+  closeDampeningThreshold = DEFAULT_PHYSICS.closeDampeningThreshold,
+  minCloseDampeningFactor = UI_CONSTANTS.minCloseDampeningFactor,
+  cursorFieldRadius = 30,
+  fieldGrowthFactor = 0.5,
+  deformationMode = 'surface-normal'
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -334,7 +431,9 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
     forceCurveExponent,
     minDampeningFactor,
     perceivedCursorOffset,
-    svgPadding // This should override DEFAULT_PHYSICS.svgPadding
+    svgPadding,
+    magneticDistribution,
+    closeDampeningThreshold
   };
 
   // Generate rectangle points
@@ -398,7 +497,7 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
     return points;
   };
 
-  // Calculate perceived cursor position
+  // Calculate perceived cursor position (legacy - for backward compatibility)
   const calculatePerceivedCursor = (
     actualMouseX: number,
     actualMouseY: number,
@@ -424,6 +523,43 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
     const perceivedY = rectCenterY + normalized.y * perceivedDistance;
 
     return { x: perceivedX, y: perceivedY };
+  };
+
+  // Calculate individual perceived cursor for each point (new cursor field system)
+  const calculateIndividualPerceivedCursor = (
+    actualMouseX: number,
+    actualMouseY: number,
+    pointScreenX: number,
+    pointScreenY: number,
+    rectCenterX: number,
+    rectCenterY: number,
+    effectiveDistance: number
+  ) => {
+    // If cursor field is disabled, fall back to single perceived cursor
+    if (cursorFieldRadius === 0) {
+      return calculatePerceivedCursor(actualMouseX, actualMouseY, rectCenterX, rectCenterY);
+    }
+
+    // Calculate distance from cursor to shape center (for adaptive field sizing)
+    const cursorToShapeDistance = VectorUtils.calculateDistance(actualMouseX, actualMouseY, rectCenterX, rectCenterY);
+    const normalizedShapeDistance = Math.min(cursorToShapeDistance / effectiveDistance, 1);
+    
+    // Calculate adaptive field radius (grows as cursor approaches shape)
+    const adaptiveFieldRadius = cursorFieldRadius * (1 + fieldGrowthFactor * (1 - normalizedShapeDistance));
+    
+    // Calculate direction from cursor to point
+    const cursorToPointDirection = VectorUtils.normalizeVector(
+      pointScreenX - actualMouseX,
+      pointScreenY - actualMouseY
+    );
+    
+    // Calculate individual perceived cursor position for this point
+    // Points further from cursor center get attracted to positions further out in the field
+    const fieldOffset = adaptiveFieldRadius * 0.5; // Use half the field radius for the offset
+    const individualPerceivedX = actualMouseX + cursorToPointDirection.x * fieldOffset;
+    const individualPerceivedY = actualMouseY + cursorToPointDirection.y * fieldOffset;
+    
+    return { x: individualPerceivedX, y: individualPerceivedY };
   };
 
   // Check if point is inside shape using SVG hit detection
@@ -502,20 +638,28 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
         return { ...point };
       }
 
-      // Apply magnetic forces
+      // Apply magnetic forces with individual perceived cursor
       const pointScreenX = rectCenterX + (point.baseX - svgCenterX);
       const pointScreenY = rectCenterY + (point.baseY - svgCenterY);
 
-      const rawPointDistance = VectorUtils.calculateDistance(mouseX, mouseY, pointScreenX, pointScreenY);
+      // Calculate individual perceived cursor for this specific point
+      const individualPerceivedCursor = calculateIndividualPerceivedCursor(
+        mouseX, mouseY, pointScreenX, pointScreenY, rectCenterX, rectCenterY, effectiveDistance
+      );
+
+      // Convert individual perceived cursor to SVG coordinates
+      const individualCursorSvgX = CoordinateUtils.screenToSvg(individualPerceivedCursor.x, rectCenterX, svgCenterX, 1);
+      const individualCursorSvgY = CoordinateUtils.screenToSvg(individualPerceivedCursor.y, rectCenterY, svgCenterY, 1);
+
+      // Calculate distance to individual perceived cursor instead of actual cursor
+      const rawPointDistance = VectorUtils.calculateDistance(individualPerceivedCursor.x, individualPerceivedCursor.y, pointScreenX, pointScreenY);
       const pointDistanceToMouse = Math.max(rawPointDistance, physicsConfig.minDistance);
 
       const baseMagneticForce = PhysicsUtils.calculateBaseMagneticForce(pointDistanceToMouse, effectiveDistance, physicsConfig);
       const pointMagneticForce = baseMagneticForce * globalDampening;
 
-      const directionToCursor = VectorUtils.normalizeVector(cursorSvgX - point.baseX, cursorSvgY - point.baseY);
-
       let attractionStrength = pointMagneticForce * strength * physicsConfig.attractionMultiplier;
-      const closeDampening = PhysicsUtils.calculateCloseDampening(rawPointDistance, physicsConfig);
+      const closeDampening = PhysicsUtils.calculateCloseDampening(rawPointDistance, physicsConfig, minCloseDampeningFactor);
       attractionStrength *= closeDampening;
 
       // Apply corner dampening
@@ -533,14 +677,39 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
       }
       attractionStrength *= cornerDampening;
 
-      let newX = point.baseX + directionToCursor.x * attractionStrength;
-      let newY = point.baseY + directionToCursor.y * attractionStrength;
+      let newX: number, newY: number;
+      let pointinessDirectionX: number, pointinessDirectionY: number;
 
-      // Add pointiness
+      // Choose displacement mode: cursor direction vs surface normal
+      if (deformationMode === 'cursor') {
+        // Original cursor-direction mode (creates angular waves)
+        const directionToCursor = VectorUtils.normalizeVector(individualCursorSvgX - point.baseX, individualCursorSvgY - point.baseY);
+        newX = point.baseX + directionToCursor.x * attractionStrength;
+        newY = point.baseY + directionToCursor.y * attractionStrength;
+        pointinessDirectionX = directionToCursor.x;
+        pointinessDirectionY = directionToCursor.y;
+      } else {
+        // Surface normal mode (creates organic bulges)
+        const surfaceNormal = VectorUtils.calculateSurfaceNormal(point, isCornerPoint);
+        
+        // Only bulge if cursor is on the correct side of the surface
+        const pointToCursorDirection = VectorUtils.normalizeVector(individualCursorSvgX - point.baseX, individualCursorSvgY - point.baseY);
+        const dotProduct = surfaceNormal.x * pointToCursorDirection.x + surfaceNormal.y * pointToCursorDirection.y;
+        
+        // Only apply force if cursor is in the direction of the surface normal (dot product > 0)
+        const directionalForce = dotProduct > 0 ? attractionStrength * dotProduct : 0;
+        
+        newX = point.baseX + surfaceNormal.x * directionalForce;
+        newY = point.baseY + surfaceNormal.y * directionalForce;
+        pointinessDirectionX = surfaceNormal.x;
+        pointinessDirectionY = surfaceNormal.y;
+      }
+
+      // Add pointiness using the chosen direction
       const pointinessAmount = PhysicsUtils.calculatePointiness(pointMagneticForce, strength, rawPointDistance, physicsConfig);
       if (pointinessAmount > 0) {
-        newX += directionToCursor.x * pointinessAmount * physicsConfig.pointyReductionAmount;
-        newY += directionToCursor.y * pointinessAmount * physicsConfig.pointyReductionAmount;
+        newX += pointinessDirectionX * pointinessAmount * physicsConfig.pointyReductionAmount;
+        newY += pointinessDirectionY * pointinessAmount * physicsConfig.pointyReductionAmount;
       }
 
       // Prevent inward movement - only allow outward bulging

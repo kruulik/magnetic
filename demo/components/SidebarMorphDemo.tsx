@@ -3,7 +3,31 @@ import { gsap } from 'gsap';
 import { MagneticLavaRectangle } from '../../src/components/MagneticLavaRectangle';
 import styles from '../styles/SidebarMorphDemo.module.scss';
 
-export const SidebarMorphDemo: React.FC = () => {
+interface SidebarMorphDemoProps {
+  strength?: number;
+  attractionMultiplier?: number;
+  stretchFactor?: number;
+  forceCurveExponent?: number;
+  dampeningPower?: number;
+  surfaceBuffer?: number;
+  magneticDistribution?: number;
+  closeDampeningThreshold?: number;
+  minCloseDampeningFactor?: number;
+  deformationMode?: 'cursor' | 'surface-normal';
+}
+
+export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
+  strength = 8,
+  attractionMultiplier = 200,
+  stretchFactor = 3.0,
+  forceCurveExponent = 0.3,
+  dampeningPower = 0.1,
+  surfaceBuffer = 10000,
+  magneticDistribution = 0.5,
+  closeDampeningThreshold = 0,
+  minCloseDampeningFactor = 1.0,
+  deformationMode = 'surface-normal'
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -99,7 +123,7 @@ export const SidebarMorphDemo: React.FC = () => {
         onClick={handleClick}
       >
         <MagneticLavaRectangle
-          strength={isExpanded ? 0 : 8}
+          strength={isExpanded ? 0 : strength}
           duration={0.3}
           distance={isExpanded ? 0 : 0}
           ease="power2.out"
@@ -108,13 +132,22 @@ export const SidebarMorphDemo: React.FC = () => {
           pointsPerSide={20}
           fill={sidebarColor}
           onCursorInside={isExpanded ? undefined : handleCursorInside}
-          attractionMultiplier={isExpanded ? 0 : 1}
+          attractionMultiplier={isExpanded ? 0 : attractionMultiplier}
           pointinessFactor={0.1}
           minDistance={0}
-          surfaceBuffer={0}
-          stretchFactor={0.1}
+          surfaceBuffer={surfaceBuffer}
+          stretchFactor={stretchFactor}
+          pointinessMultiplier={1.0}
+          smoothingFactor={0.4}
+          dampeningPower={dampeningPower}
+          forceCurveExponent={forceCurveExponent}
+          minDampeningFactor={1.0}
           cornerDeflectionFactor={0.0}
-          perceivedCursorOffset={20}
+          perceivedCursorOffset={0}
+          magneticDistribution={magneticDistribution}
+          closeDampeningThreshold={closeDampeningThreshold}
+          minCloseDampeningFactor={minCloseDampeningFactor}
+          deformationMode={deformationMode}
           className={styles.magneticWrapper}
         /></div>
 
