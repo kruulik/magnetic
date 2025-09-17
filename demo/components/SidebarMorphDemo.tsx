@@ -1,37 +1,38 @@
-import React, { useRef, useEffect, useState } from 'react';
 import { gsap } from 'gsap';
+import React, { useRef, useEffect, useState } from 'react';
+
 import { MagneticLavaRectangle } from '../../src/components/MagneticLavaRectangle';
 import styles from '../styles/SidebarMorphDemo.module.scss';
 
 interface SidebarMorphDemoProps {
   strength?: number;
-  stretchFactor?: number;
-  forceCurveExponent?: number;
-  dampeningPower?: number;
-  surfaceBuffer?: number;
-  magneticDistribution?: number;
-  closeDampeningThreshold?: number;
-  minCloseDampeningFactor?: number;
+  stretchiness?: number;
   deformationMode?: 'cursor' | 'surface-normal';
 }
 
-export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
-  strength = 240, // Increased from 8 to 240 (8 * 30) to compensate for removed attractionMultiplier
-  stretchFactor = 3.0,
-  forceCurveExponent = 0.3,
-  dampeningPower = 0.1,
-  surfaceBuffer = 10000,
-  magneticDistribution = 0.5,
-  closeDampeningThreshold = 0,
-  minCloseDampeningFactor = 1.0,
-  deformationMode = 'surface-normal'
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [morphTween, setMorphTween] = useState<gsap.core.Tween | null>(null);
+// Constants for animation and styling
+const SIDEBAR_CONSTANTS = {
+  DEFAULT_STRENGTH: 240,
+  DEFAULT_STRETCHINESS: 0.8,
+  ANIMATION_DURATION: 0.8,
+  MAGNETIC_DURATION: 0.3,
+  SIDEBAR_WIDTH: 50,
+  POINTS_PER_SIDE: 20,
+  EXPANDED_STRENGTH: 0,
+  EXPANDED_DISTANCE: 0,
+  MIN_DISTANCE: 0,
+  CORNER_DEFLECTION_FACTOR: 0.0,
+  PERCEIVED_CURSOR_OFFSET: 0
+} as const;
 
-  // Detect dark mode
+const COLORS = {
+  LIGHT_MODE: '#ffffff',
+  DARK_MODE: '#000000'
+} as const;
+
+const useDarkMode = () => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     setIsDarkMode(mediaQuery.matches);
@@ -44,33 +45,32 @@ export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Handle cursor inside callback - only respond when not expanded
-  const handleCursorInside = (isInside: boolean) => {
-    if (isInside && !isExpanded) {
-      expandToFullScreen();
-    }
-  };
+  return isDarkMode;
+};
 
-  // Expand to full screen
-  const expandToFullScreen = () => {
-    if (isExpanded || !containerRef.current) return;
+const useExpansionAnimation = () => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [morphTween, setMorphTween] = useState<gsap.core.Tween | null>(null);
 
-    setIsExpanded(true);
-
-    // Kill any existing tween
+  const killExistingTween = () => {
     if (morphTween) {
       morphTween.kill();
     }
+  };
 
-    // Get viewport dimensions
+  const expandToFullScreen = (containerRef: React.RefObject<HTMLDivElement>) => {
+    if (isExpanded || !containerRef.current) return;
+
+    setIsExpanded(true);
+    killExistingTween();
+
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // Animate the container to cover full screen
     const tween = gsap.to(containerRef.current, {
       width: viewportWidth,
       height: viewportHeight,
-      duration: 0.8,
+      duration: SIDEBAR_CONSTANTS.ANIMATION_DURATION,
       ease: "power2.out",
       onComplete: () => {
         setMorphTween(null);
@@ -80,20 +80,15 @@ export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
     setMorphTween(tween);
   };
 
-  // Contract back to sidebar
-  const contractToSidebar = () => {
+  const contractToSidebar = (containerRef: React.RefObject<HTMLDivElement>) => {
     if (!isExpanded || !containerRef.current) return;
 
-    // Kill any existing tween
-    if (morphTween) {
-      morphTween.kill();
-    }
+    killExistingTween();
 
-    // Animate back to sidebar dimensions
     const tween = gsap.to(containerRef.current, {
-      width: 50,
+      width: SIDEBAR_CONSTANTS.SIDEBAR_WIDTH,
       height: '100vh',
-      duration: 0.8,
+      duration: SIDEBAR_CONSTANTS.ANIMATION_DURATION,
       ease: "power2.out",
       onComplete: () => {
         setIsExpanded(false);
@@ -104,14 +99,35 @@ export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
     setMorphTween(tween);
   };
 
-  // Handle click when expanded
-  const handleClick = () => {
-    if (isExpanded) {
-      contractToSidebar();
+  return {
+    isExpanded,
+    expandToFullScreen,
+    contractToSidebar
+  };
+};
+
+export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
+  strength = SIDEBAR_CONSTANTS.DEFAULT_STRENGTH,
+  stretchiness = SIDEBAR_CONSTANTS.DEFAULT_STRETCHINESS,
+  deformationMode = 'surface-normal'
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDarkMode = useDarkMode();
+  const { isExpanded, expandToFullScreen, contractToSidebar } = useExpansionAnimation();
+
+  const handleCursorInside = (isInside: boolean) => {
+    if (isInside && !isExpanded) {
+      expandToFullScreen(containerRef);
     }
   };
 
-  const sidebarColor = !isDarkMode ? '#ffffff' : '#000000';
+  const handleClick = () => {
+    if (isExpanded) {
+      contractToSidebar(containerRef);
+    }
+  };
+
+  const sidebarColor = !isDarkMode ? COLORS.LIGHT_MODE : COLORS.DARK_MODE;
 
   return (
     <div className={styles.sidebarMorphContainer}>
@@ -121,32 +137,23 @@ export const SidebarMorphDemo: React.FC<SidebarMorphDemoProps> = ({
         onClick={handleClick}
       >
         <MagneticLavaRectangle
-          strength={isExpanded ? 0 : strength}
-          duration={0.3}
-          distance={isExpanded ? 0 : 0}
+          strength={isExpanded ? SIDEBAR_CONSTANTS.EXPANDED_STRENGTH : strength}
+          duration={SIDEBAR_CONSTANTS.MAGNETIC_DURATION}
+          distance={isExpanded ? SIDEBAR_CONSTANTS.EXPANDED_DISTANCE : 0}
           ease="power2.out"
           fullWindow
           activeSides={isExpanded ? [] : ['right']}
-          pointsPerSide={20}
+          pointsPerSide={SIDEBAR_CONSTANTS.POINTS_PER_SIDE}
           fill={sidebarColor}
           onCursorInside={isExpanded ? undefined : handleCursorInside}
-          pointinessFactor={0.1}
-          minDistance={0}
-          surfaceBuffer={surfaceBuffer}
-          stretchFactor={stretchFactor}
-          pointinessMultiplier={1.0}
-          smoothingFactor={0.4}
-          dampeningPower={dampeningPower}
-          forceCurveExponent={forceCurveExponent}
-          minDampeningFactor={1.0}
-          cornerDeflectionFactor={0.0}
-          perceivedCursorOffset={0}
-          magneticDistribution={magneticDistribution}
-          closeDampeningThreshold={closeDampeningThreshold}
-          minCloseDampeningFactor={minCloseDampeningFactor}
+          stretchiness={stretchiness}
+          minDistance={SIDEBAR_CONSTANTS.MIN_DISTANCE}
+          cornerDeflectionFactor={SIDEBAR_CONSTANTS.CORNER_DEFLECTION_FACTOR}
+          perceivedCursorOffset={SIDEBAR_CONSTANTS.PERCEIVED_CURSOR_OFFSET}
           deformationMode={deformationMode}
           className={styles.magneticWrapper}
-        /></div>
+        />
+      </div>
 
       <div className={styles.instructions}>
         <p>Hover over the left edge to expand • Click anywhere to contract</p>

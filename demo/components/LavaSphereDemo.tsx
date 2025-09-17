@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react';
 import { gsap } from 'gsap';
+import React, { useRef, useEffect, useState } from 'react';
+
 import styles from '../styles/LavaSphereDemo.module.scss';
 
 interface LavaSphereDemoProps {
@@ -82,20 +83,14 @@ const UI_CONSTANTS = {
 
 // Coordinate system utilities
 const CoordinateUtils = {
-  screenToSvg: (screenCoord: number, screenCenter: number, svgCenter: number, ratio: number): number => {
-    return (screenCoord - screenCenter) * ratio + svgCenter;
-  },
+  screenToSvg: (screenCoord: number, screenCenter: number, svgCenter: number, ratio: number): number => (screenCoord - screenCenter) * ratio + svgCenter,
   
-  svgToScreen: (svgCoord: number, svgCenter: number, screenCenter: number, ratio: number): number => {
-    return (svgCoord - svgCenter) / ratio + screenCenter;
-  }
+  svgToScreen: (svgCoord: number, svgCenter: number, screenCenter: number, ratio: number): number => (svgCoord - svgCenter) / ratio + screenCenter
 };
 
 // Distance and direction calculations
 const VectorUtils = {
-  calculateDistance: (x1: number, y1: number, x2: number, y2: number): number => {
-    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-  },
+  calculateDistance: (x1: number, y1: number, x2: number, y2: number): number => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)),
   
   normalizeVector: (x: number, y: number): { x: number; y: number; length: number } => {
     const length = Math.sqrt(x * x + y * y);
@@ -106,9 +101,7 @@ const VectorUtils = {
     };
   },
   
-  calculateAngle: (x: number, y: number): number => {
-    return Math.atan2(y, x);
-  }
+  calculateAngle: (x: number, y: number): number => Math.atan2(y, x)
 };
 
 // Physics calculations

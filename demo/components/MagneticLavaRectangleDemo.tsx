@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { MagneticLavaRectangle } from '../../src/components/MagneticLavaRectangle';
 import styles from '../styles/MagneticLavaRectangleDemo.module.scss';
 
@@ -21,30 +22,13 @@ interface MagneticLavaRectangleDemoProps {
   baseColor?: string;
   hoverColor?: string;
   
-  // Physics parameters
-  pointinessFactor?: number;
+  // Physics parameters - essential 5 parameters only
+  stretchiness?: number;
   minDistance?: number;
-  surfaceBuffer?: number;
-  stretchFactor?: number;
-  pointinessMultiplier?: number;
-  smoothingFactor?: number;
-  dampeningPower?: number;
-  forceCurveExponent?: number;
-  minDampeningFactor?: number;
   perceivedCursorOffset?: number;
   cornerDeflectionFactor?: number;
-  magneticDistribution?: number;
-  closeDampeningThreshold?: number;
-  minCloseDampeningFactor?: number;
-  cursorFieldRadius?: number;
-  fieldGrowthFactor?: number;
   deformationMode?: 'cursor' | 'surface-normal';
   
-  // Bulge calculation parameters
-  optimalDistanceMultiplier?: number;
-  maxBulgeSafetyMargin?: number;
-  maxExpansionCap?: number;
-  minExpansionFloor?: number;
 }
 
 // Demo-specific constants
@@ -68,28 +52,11 @@ export const MagneticLavaRectangleDemo: React.FC<MagneticLavaRectangleDemoProps>
   baseColor = '#3b3ec0ff',
   hoverColor = '#ef4444',
   // Physics parameters
-  pointinessFactor,
+  stretchiness,
   minDistance,
-  surfaceBuffer,
-  stretchFactor,
-  pointinessMultiplier,
-  smoothingFactor,
-  dampeningPower,
-  forceCurveExponent,
-  minDampeningFactor,
   perceivedCursorOffset,
   cornerDeflectionFactor,
-  magneticDistribution,
-  closeDampeningThreshold,
-  minCloseDampeningFactor,
-  cursorFieldRadius,
-  fieldGrowthFactor,
   deformationMode,
-  // Bulge calculation parameters
-  optimalDistanceMultiplier,
-  maxBulgeSafetyMargin,
-  maxExpansionCap,
-  minExpansionFloor
 }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [perceivedMousePos, setPerceivedMousePos] = useState({ x: 0, y: 0 });
@@ -151,28 +118,11 @@ export const MagneticLavaRectangleDemo: React.FC<MagneticLavaRectangleDemoProps>
           fullWindow={fullWindow}
           onCursorInside={handleCursorInside}
           onMouseMove={handleMouseMove}
-          pointinessFactor={pointinessFactor}
+          stretchiness={stretchiness}
           minDistance={minDistance}
-          surfaceBuffer={surfaceBuffer}
-          stretchFactor={stretchFactor}
-          pointinessMultiplier={pointinessMultiplier}
-          smoothingFactor={smoothingFactor}
-          dampeningPower={dampeningPower}
-          forceCurveExponent={forceCurveExponent}
-          minDampeningFactor={minDampeningFactor}
           perceivedCursorOffset={perceivedCursorOffset}
           cornerDeflectionFactor={cornerDeflectionFactor}
-          magneticDistribution={magneticDistribution}
-          closeDampeningThreshold={closeDampeningThreshold}
-          minCloseDampeningFactor={minCloseDampeningFactor}
-          cursorFieldRadius={cursorFieldRadius}
-          fieldGrowthFactor={fieldGrowthFactor}
           deformationMode={deformationMode}
-          optimalDistanceMultiplier={optimalDistanceMultiplier}
-          maxBulgeSafetyMargin={maxBulgeSafetyMargin}
-          maxExpansionCap={maxExpansionCap}
-          minExpansionFloor={minExpansionFloor}
-          svgPadding={0}
           className={styles.magneticRectangle}
         />
         

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SingleSphereDemo } from './components/SingleSphereDemo';
-import { MultiSphereDemo } from './components/MultiSphereDemo';
+
 import { LavaSphereDemo } from './components/LavaSphereDemo';
-import { MultiLavaSphereDemo } from './components/MultiLavaSphereDemo';
 import { MagneticLavaRectangleDemo } from './components/MagneticLavaRectangleDemo';
+import { MultiLavaSphereDemo } from './components/MultiLavaSphereDemo';
+import { MultiSphereDemo } from './components/MultiSphereDemo';
 import { SidebarMorphDemo } from './components/SidebarMorphDemo';
+import { SingleSphereDemo } from './components/SingleSphereDemo';
 import './styles/globals.scss';
 import styles from './styles/Demo.module.scss';
 
@@ -21,13 +22,13 @@ const Demo: React.FC = () => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // Physics parameters for LavaSphereDemo
-  const [attractionMultiplier, setAttractionMultiplier] = useState(30);
+  // Physics parameters for MagneticLavaRectangle (stretchiness replaces old pointiness/stretch)
+  const [stretchiness, setStretchiness] = useState(0.5);
   const [pointinessFactor, setPointinessFactor] = useState(0.5);
-  const [minDistance, setMinDistance] = useState(20);
-  const [surfaceBuffer, setSurfaceBuffer] = useState(60);
   const [stretchFactor, setStretchFactor] = useState(0.6);
   const [pointinessMultiplier, setPointinessMultiplier] = useState(1.2);
+  const [minDistance, setMinDistance] = useState(20);
+  const [surfaceBuffer, setSurfaceBuffer] = useState(60);
   const [smoothingFactor, setSmoothingFactor] = useState(0.4);
   const [dampeningPower, setDampeningPower] = useState(0.6);
   const [forceCurveExponent, setForceCurveExponent] = useState(2.5);
@@ -40,11 +41,6 @@ const Demo: React.FC = () => {
   const [fieldGrowthFactor, setFieldGrowthFactor] = useState(0.5);
   const [deformationMode, setDeformationMode] = useState<'cursor' | 'surface-normal'>('surface-normal');
 
-  // Bulge calculation parameters
-  const [optimalDistanceMultiplier, setOptimalDistanceMultiplier] = useState(2.5);
-  const [maxBulgeSafetyMargin, setMaxBulgeSafetyMargin] = useState(0.8);
-  const [maxExpansionCap, setMaxExpansionCap] = useState(40);
-  const [minExpansionFloor, setMinExpansionFloor] = useState(15);
 
   // Rectangle-specific parameters
   const [activeSides, setActiveSides] = useState<Array<'top' | 'right' | 'bottom' | 'left'>>(['right', 'bottom']);
@@ -85,13 +81,7 @@ const Demo: React.FC = () => {
       {demoType === 'sidebar-morph' && (
         <SidebarMorphDemo
           strength={strength}
-          stretchFactor={stretchFactor}
-          forceCurveExponent={forceCurveExponent}
-          dampeningPower={dampeningPower}
-          surfaceBuffer={surfaceBuffer}
-          magneticDistribution={magneticDistribution}
-          closeDampeningThreshold={closeDampeningThreshold}
-          minCloseDampeningFactor={minCloseDampeningFactor}
+          stretchiness={stretchiness}
           deformationMode={deformationMode}
         />
       )}
@@ -162,27 +152,11 @@ const Demo: React.FC = () => {
               // Optional: could add visual feedback here
               console.log('Cursor inside rectangle:', isInside);
             }}
-            pointinessFactor={pointinessFactor}
+            stretchiness={stretchiness}
             minDistance={minDistance}
-            surfaceBuffer={surfaceBuffer}
-            stretchFactor={stretchFactor}
-            pointinessMultiplier={pointinessMultiplier}
-            smoothingFactor={smoothingFactor}
-            dampeningPower={dampeningPower}
-            forceCurveExponent={forceCurveExponent}
-            minDampeningFactor={minDampeningFactor}
             perceivedCursorOffset={perceivedCursorOffset}
             cornerDeflectionFactor={cornerDeflectionFactor}
-            magneticDistribution={magneticDistribution}
-            closeDampeningThreshold={closeDampeningThreshold}
-            minCloseDampeningFactor={minCloseDampeningFactor}
-            cursorFieldRadius={cursorFieldRadius}
-            fieldGrowthFactor={fieldGrowthFactor}
             deformationMode={deformationMode}
-            optimalDistanceMultiplier={optimalDistanceMultiplier}
-            maxBulgeSafetyMargin={maxBulgeSafetyMargin}
-            maxExpansionCap={maxExpansionCap}
-            minExpansionFloor={minExpansionFloor}
           />
         ) : (
           <LavaSphereDemo
@@ -192,7 +166,6 @@ const Demo: React.FC = () => {
             ease={ease}
             fullWindow={fullWindow}
             showTooltip={showTooltip}
-            attractionMultiplier={attractionMultiplier}
             pointinessFactor={pointinessFactor}
             minDistance={minDistance}
             surfaceBuffer={surfaceBuffer}
@@ -555,29 +528,29 @@ const Demo: React.FC = () => {
               </div>
 
               <div className={styles.controlGroup}>
-                <label>Pointiness Factor</label>
+                <label>Stretchiness (0=gentle, 1=sharp)</label>
                 <input
                   type="range"
-                  min="0.1"
+                  min="0.0"
                   max="1.0"
                   step="0.1"
-                  value={pointinessFactor}
-                  onChange={(e) => setPointinessFactor(parseFloat(e.target.value))}
+                  value={stretchiness}
+                  onChange={(e) => setStretchiness(parseFloat(e.target.value))}
                 />
-                <div className={styles.controlValue}>{pointinessFactor}</div>
+                <div className={styles.controlValue}>{stretchiness}</div>
               </div>
 
               <div className={styles.controlGroup}>
-                <label>Stretch Factor</label>
+                <label>Corner Deflection Factor</label>
                 <input
                   type="range"
-                  min="0.2"
-                  max="1.5"
+                  min="0.0"
+                  max="1.0"
                   step="0.1"
-                  value={stretchFactor}
-                  onChange={(e) => setStretchFactor(parseFloat(e.target.value))}
+                  value={cornerDeflectionFactor}
+                  onChange={(e) => setCornerDeflectionFactor(parseFloat(e.target.value))}
                 />
-                <div className={styles.controlValue}>{stretchFactor}</div>
+                <div className={styles.controlValue}>{cornerDeflectionFactor}</div>
               </div>
 
               {deformationMode === 'cursor' && (
@@ -595,236 +568,10 @@ const Demo: React.FC = () => {
                 </div>
               )}
 
-              <div className={styles.controlGroup}>
-                <label>Corner Deflection Factor</label>
-                <input
-                  type="range"
-                  min="0.0"
-                  max="1.0"
-                  step="0.1"
-                  value={cornerDeflectionFactor}
-                  onChange={(e) => setCornerDeflectionFactor(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{cornerDeflectionFactor}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Magnetic Distribution</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="3.0"
-                  step="0.1"
-                  value={magneticDistribution}
-                  onChange={(e) => setMagneticDistribution(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{magneticDistribution}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Close Dampening Threshold</label>
-                <input
-                  type="range"
-                  min="1.0"
-                  max="10.0"
-                  step="0.5"
-                  value={closeDampeningThreshold}
-                  onChange={(e) => setCloseDampeningThreshold(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{closeDampeningThreshold}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Min Close Dampening Factor</label>
-                <input
-                  type="range"
-                  min="0.01"
-                  max="1.0"
-                  step="0.05"
-                  value={minCloseDampeningFactor}
-                  onChange={(e) => setMinCloseDampeningFactor(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{minCloseDampeningFactor}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Pointiness Multiplier</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.0"
-                  step="0.1"
-                  value={pointinessMultiplier}
-                  onChange={(e) => setPointinessMultiplier(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{pointinessMultiplier}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Smoothing Factor</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="0.8"
-                  step="0.1"
-                  value={smoothingFactor}
-                  onChange={(e) => setSmoothingFactor(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{smoothingFactor}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Dampening Power</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="1.2"
-                  step="0.1"
-                  value={dampeningPower}
-                  onChange={(e) => setDampeningPower(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{dampeningPower}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Force Curve Exponent</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="4.0"
-                  step="0.1"
-                  value={forceCurveExponent}
-                  onChange={(e) => setForceCurveExponent(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{forceCurveExponent}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Min Dampening Factor</label>
-                <input
-                  type="range"
-                  min="0.05"
-                  max="1.0"
-                  step="0.05"
-                  value={minDampeningFactor}
-                  onChange={(e) => setMinDampeningFactor(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{minDampeningFactor}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Surface Buffer</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="10000"
-                  step="100"
-                  value={surfaceBuffer}
-                  onChange={(e) => setSurfaceBuffer(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{surfaceBuffer}px</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Minimum Distance</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  step="5"
-                  value={minDistance}
-                  onChange={(e) => setMinDistance(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{minDistance}px</div>
-              </div>
-
-              {deformationMode === 'cursor' && (
-                <>
-                  <div className={styles.controlGroup}>
-                    <label>Cursor Field Radius</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={cursorFieldRadius}
-                      onChange={(e) => setCursorFieldRadius(parseInt(e.target.value))}
-                    />
-                    <div className={styles.controlValue}>{cursorFieldRadius}px</div>
-                  </div>
-
-                  <div className={styles.controlGroup}>
-                    <label>Field Growth Factor</label>
-                    <input
-                      type="range"
-                      min="0.0"
-                      max="2.0"
-                      step="0.1"
-                      value={fieldGrowthFactor}
-                      onChange={(e) => setFieldGrowthFactor(parseFloat(e.target.value))}
-                    />
-                    <div className={styles.controlValue}>{fieldGrowthFactor}</div>
-                  </div>
-                </>
-              )}
-
-              <h4 className={styles.parametersTitle}>Bulge Calculation Parameters</h4>
-              
-              <div className={styles.controlGroup}>
-                <label>Optimal Distance Multiplier</label>
-                <input
-                  type="range"
-                  min="1.0"
-                  max="5.0"
-                  step="0.1"
-                  value={optimalDistanceMultiplier}
-                  onChange={(e) => setOptimalDistanceMultiplier(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{optimalDistanceMultiplier}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Max Bulge Safety Margin</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="1.0"
-                  step="0.05"
-                  value={maxBulgeSafetyMargin}
-                  onChange={(e) => setMaxBulgeSafetyMargin(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{maxBulgeSafetyMargin}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Max Expansion Cap</label>
-                <input
-                  type="range"
-                  min="10"
-                  max="100"
-                  step="5"
-                  value={maxExpansionCap}
-                  onChange={(e) => setMaxExpansionCap(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{maxExpansionCap}px</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Min Expansion Floor</label>
-                <input
-                  type="range"
-                  min="5"
-                  max="30"
-                  step="1"
-                  value={minExpansionFloor}
-                  onChange={(e) => setMinExpansionFloor(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{minExpansionFloor}px</div>
-              </div>
             </>
           )}
 
-          {/* Sidebar Controls for Sidebar Morph Demo */}
+          {/* Sidebar Controls for Sidebar Morph Demo - Essential Parameters Only */}
           {demoType === 'sidebar-morph' && (
             <>
               <h4 className={styles.parametersTitle}>Sidebar Physics Parameters</h4>
@@ -841,94 +588,16 @@ const Demo: React.FC = () => {
               </div>
 
               <div className={styles.controlGroup}>
-                <label>Stretch Factor</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="5.0"
-                  step="0.1"
-                  value={stretchFactor}
-                  onChange={(e) => setStretchFactor(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{stretchFactor}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Force Curve Exponent</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="4.0"
-                  step="0.1"
-                  value={forceCurveExponent}
-                  onChange={(e) => setForceCurveExponent(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{forceCurveExponent}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Dampening Power</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="1.2"
-                  step="0.1"
-                  value={dampeningPower}
-                  onChange={(e) => setDampeningPower(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{dampeningPower}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Surface Buffer</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="10000"
-                  step="100"
-                  value={surfaceBuffer}
-                  onChange={(e) => setSurfaceBuffer(parseInt(e.target.value))}
-                />
-                <div className={styles.controlValue}>{surfaceBuffer}px</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Magnetic Distribution</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="5.0"
-                  step="0.1"
-                  value={magneticDistribution}
-                  onChange={(e) => setMagneticDistribution(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{magneticDistribution}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Close Dampening Threshold</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="10.0"
-                  step="0.5"
-                  value={closeDampeningThreshold}
-                  onChange={(e) => setCloseDampeningThreshold(parseFloat(e.target.value))}
-                />
-                <div className={styles.controlValue}>{closeDampeningThreshold}</div>
-              </div>
-
-              <div className={styles.controlGroup}>
-                <label>Min Close Dampening Factor</label>
+                <label>Stretchiness (0=gentle, 1=sharp)</label>
                 <input
                   type="range"
                   min="0.0"
                   max="1.0"
-                  step="0.05"
-                  value={minCloseDampeningFactor}
-                  onChange={(e) => setMinCloseDampeningFactor(parseFloat(e.target.value))}
+                  step="0.1"
+                  value={stretchiness}
+                  onChange={(e) => setStretchiness(parseFloat(e.target.value))}
                 />
-                <div className={styles.controlValue}>{minCloseDampeningFactor}</div>
+                <div className={styles.controlValue}>{stretchiness}</div>
               </div>
             </>
           )}
