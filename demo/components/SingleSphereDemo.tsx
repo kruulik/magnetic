@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 import { useMagnetic } from '../../src/index';
 import styles from '../styles/SingleSphereDemo.module.scss';
@@ -91,28 +91,25 @@ const PhysicsTest: React.FC<{
   effectiveDistance: number;
 }> = ({ distance, strength, fullWindow, effectiveDistance }) => {
   const physics = calculateMagneticForce(distance, strength, fullWindow, effectiveDistance);
-  
   return (
     <div className={styles.physicsTest}>
-      <div className={styles.physicsDistance}>
-        Distance: {distance}px
-      </div>
+      <div className={styles.physicsDistance}>Distance: {distance}px</div>
 
-      <div 
+      <div
         className={styles.physicsCursor}
         style={{
-          left: `${PHYSICS_CONSTANTS.PHYSICS_PANEL_BASE_X + distance * PHYSICS_CONSTANTS.PHYSICS_PANEL_SCALE}px`,
-        }} 
+          left: `${PHYSICS_CONSTANTS.PHYSICS_PANEL_BASE_X + distance * PHYSICS_CONSTANTS.PHYSICS_PANEL_SCALE}px`
+        }}
       />
 
-      <div 
+      <div
         className={styles.physicsSphere}
         style={{
-          transform: `translateX(${physics.movement * PHYSICS_CONSTANTS.PHYSICS_SPHERE_SCALE}px)`,
-        }} 
+          transform: `translateX(${physics.movement * PHYSICS_CONSTANTS.PHYSICS_SPHERE_SCALE}px)`
+        }}
       />
 
-      <div 
+      <div
         className={styles.physicsInfo}
         style={{
           marginLeft: `${PHYSICS_CONSTANTS.PHYSICS_PANEL_INFO_BASE + distance * PHYSICS_CONSTANTS.PHYSICS_PANEL_SCALE}px`
@@ -130,7 +127,12 @@ const PhysicsPanel: React.FC<{
   distance: number;
 }> = ({ strength, fullWindow, distance }) => {
   const effectiveDistance = fullWindow
-    ? Math.max(PHYSICS_CONSTANTS.VIEWPORT_WIDTH, PHYSICS_CONSTANTS.VIEWPORT_HEIGHT - PHYSICS_CONSTANTS.VIEWPORT_WIDTH, PHYSICS_CONSTANTS.VIEWPORT_CENTER_Y, PHYSICS_CONSTANTS.VIEWPORT_MAX_X - PHYSICS_CONSTANTS.VIEWPORT_MAX_Y)
+    ? Math.max(
+        PHYSICS_CONSTANTS.VIEWPORT_WIDTH,
+        PHYSICS_CONSTANTS.VIEWPORT_HEIGHT - PHYSICS_CONSTANTS.VIEWPORT_WIDTH,
+        PHYSICS_CONSTANTS.VIEWPORT_CENTER_Y,
+        PHYSICS_CONSTANTS.VIEWPORT_MAX_X - PHYSICS_CONSTANTS.VIEWPORT_MAX_Y
+      )
     : distance;
 
   return (
@@ -157,20 +159,26 @@ const Tooltip: React.FC<{
   if (!show || !debugInfo) return null;
 
   return (
-    <div 
+    <div
       className={`${styles.tooltip} ${!debugInfo.active ? styles.inactive : ''}`}
       style={{
         left: mousePos.x + PHYSICS_CONSTANTS.TOOLTIP_OFFSET_X,
-        top: mousePos.y - PHYSICS_CONSTANTS.TOOLTIP_OFFSET_Y,
+        top: mousePos.y - PHYSICS_CONSTANTS.TOOLTIP_OFFSET_Y
       }}
     >
-      <div className={styles.tooltipDistance}>Distance: <strong>{debugInfo.distance.toFixed(1)}px</strong></div>
-      <div className={styles.tooltipDistance}>Effective: <strong>{debugInfo.effectiveDistance.toFixed(0)}px</strong></div>
-      <div className={styles.tooltipDistance}>Force: <strong>{debugInfo.force.toFixed(PHYSICS_CONSTANTS.POWER_OF_THREE)}</strong></div>
-      <div className={styles.tooltipDistance}>Movement: <strong>{debugInfo.movement.toFixed(1)}px</strong></div>
-      <div className={styles.tooltipStatus}>
-        {debugInfo.active ? '✓ ACTIVE' : '✗ INACTIVE'}
+      <div className={styles.tooltipDistance}>
+        Distance: <strong>{debugInfo.distance.toFixed(1)}px</strong>
       </div>
+      <div className={styles.tooltipDistance}>
+        Effective: <strong>{debugInfo.effectiveDistance.toFixed(0)}px</strong>
+      </div>
+      <div className={styles.tooltipDistance}>
+        Force: <strong>{debugInfo.force.toFixed(PHYSICS_CONSTANTS.POWER_OF_THREE)}</strong>
+      </div>
+      <div className={styles.tooltipDistance}>
+        Movement: <strong>{debugInfo.movement.toFixed(1)}px</strong>
+      </div>
+      <div className={styles.tooltipStatus}>{debugInfo.active ? '✓ ACTIVE' : '✗ INACTIVE'}</div>
     </div>
   );
 };
@@ -178,28 +186,19 @@ const Tooltip: React.FC<{
 const calculateCursorDistance = (mouseX: number, mouseY: number, rect: DOMRect): number => {
   const centerX = rect.left + rect.width / PHYSICS_CONSTANTS.HALF;
   const centerY = rect.top + rect.height / PHYSICS_CONSTANTS.HALF;
-  
-  return Math.sqrt(
-    Math.pow(mouseX - centerX, PHYSICS_CONSTANTS.HALF) + Math.pow(mouseY - centerY, PHYSICS_CONSTANTS.HALF)
-  );
+  return Math.sqrt(Math.pow(mouseX - centerX, PHYSICS_CONSTANTS.HALF) + Math.pow(mouseY - centerY, PHYSICS_CONSTANTS.HALF));
 };
 
 const calculateEffectiveDistance = (rect: DOMRect, distance: number, fullWindow: boolean): number => {
   if (!fullWindow) return distance;
-  
   const centerX = rect.left + rect.width / PHYSICS_CONSTANTS.HALF;
   const centerY = rect.top + rect.height / PHYSICS_CONSTANTS.HALF;
-  
   return Math.max(centerX, window.innerWidth - centerX, centerY, window.innerHeight - centerY);
 };
 
 const calculateMovement = (cursorDistance: number, attractionStrength: number, effectiveDistance: number): number => {
   if (cursorDistance <= 0) return 0;
-  
-  if (cursorDistance < PHYSICS_CONSTANTS.CLOSE_DISTANCE_THRESHOLD) {
-    return attractionStrength * cursorDistance;
-  }
-  
+  if (cursorDistance < PHYSICS_CONSTANTS.CLOSE_DISTANCE_THRESHOLD) return attractionStrength * cursorDistance;
   const baseMovement = attractionStrength * (effectiveDistance * PHYSICS_CONSTANTS.DISTANCE_SCALE_FACTOR);
   return baseMovement * (1 - Math.exp(-cursorDistance / PHYSICS_CONSTANTS.EXPONENTIAL_DIVISOR));
 };
@@ -214,83 +213,79 @@ const calculateDebugInfo = (params: {
 }): DebugInfo => {
   const { mouseX, mouseY, sphereElement, strength, distance, fullWindow } = params;
   const rect = sphereElement.getBoundingClientRect();
-  
   const cursorDistance = calculateCursorDistance(mouseX, mouseY, rect);
   const effectiveDistance = calculateEffectiveDistance(rect, distance, fullWindow);
-  
   const normalizedDistance = cursorDistance / effectiveDistance;
   const magneticForce = Math.pow(1 - Math.min(normalizedDistance, 1), PHYSICS_CONSTANTS.POWER_OF_THREE);
   const attractionStrength = magneticForce * strength;
-  
   const movement = calculateMovement(cursorDistance, attractionStrength, effectiveDistance);
   const isActive = fullWindow || cursorDistance < distance;
+  return { distance: cursorDistance, force: magneticForce, movement, effectiveDistance, active: isActive };
+};
 
-  return {
-    distance: cursorDistance,
-    force: magneticForce,
-    movement,
-    effectiveDistance,
-    active: isActive
-  };
+// Hook to keep component short
+const useSingleSphereInteractions = (
+  strength: number,
+  distance: number,
+  fullWindow: boolean
+) => {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const magneticRef = useMagnetic<HTMLDivElement>({
+    strength,
+    distance,
+    duration: 0.3,
+    ease: 'power2.out',
+    fullWindow,
+    debug: false
+  });
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+      const sphereElement = magneticRef.current;
+      if (sphereElement) {
+        const newDebugInfo = calculateDebugInfo({
+          mouseX: e.clientX,
+          mouseY: e.clientY,
+          sphereElement,
+          strength,
+          distance,
+          fullWindow
+        });
+        setDebugInfo(newDebugInfo);
+      }
+    },
+    [magneticRef, strength, distance, fullWindow]
+  );
+
+  return useMemo(
+    () => ({ mousePos, debugInfo, handleMouseMove, magneticRef }),
+    [mousePos, debugInfo, handleMouseMove, magneticRef]
+  );
 };
 
 export const SingleSphereDemo: React.FC<SingleSphereDemoProps> = ({
   strength,
   distance,
-  duration,
-  ease,
+  duration: _duration,
+  ease: _ease,
   fullWindow,
   showTooltip
 }) => {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-
-  const magneticRef = useMagnetic<HTMLDivElement>({
+  const { mousePos, debugInfo, handleMouseMove, magneticRef } = useSingleSphereInteractions(
     strength,
     distance,
-    duration,
-    ease,
-    fullWindow,
-    debug: false
-  });
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    setMousePos({ x: e.clientX, y: e.clientY });
-
-    const sphereElement = magneticRef.current;
-    if (sphereElement) {
-      const newDebugInfo = calculateDebugInfo({
-        mouseX: e.clientX,
-        mouseY: e.clientY,
-        sphereElement,
-        strength,
-        distance,
-        fullWindow
-      });
-      setDebugInfo(newDebugInfo);
-    }
-  };
+    fullWindow
+  );
 
   return (
     <div className={styles.demoContent} onMouseMove={handleMouseMove}>
       <div className={styles.sphereContainer}>
-        <div
-          ref={magneticRef}
-          className={styles.sphere}
-        />
-
-        <PhysicsPanel 
-          strength={strength}
-          fullWindow={fullWindow}
-          distance={distance}
-        />
+        <div ref={magneticRef} className={styles.sphere} />
+        <PhysicsPanel strength={strength} fullWindow={fullWindow} distance={distance} />
       </div>
-
-      <Tooltip 
-        mousePos={mousePos}
-        debugInfo={debugInfo}
-        show={showTooltip}
-      />
+      <Tooltip mousePos={mousePos} debugInfo={debugInfo} show={showTooltip} />
     </div>
   );
 };

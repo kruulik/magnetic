@@ -1,6 +1,17 @@
 import { gsap } from 'gsap';
 import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 
+import {
+  type RectPoint,
+  type PhysicsConfig as BasePhysicsConfig,
+  VectorUtils,
+  PhysicsUtils,
+  generateRectanglePoints,
+  getSortOrder,
+  calculateDistanceToRectangleBoundary,
+  calculateDistanceBasedStrength
+} from '../utils/rectanglePhysics';
+
 // Core component interface - no demo-specific props
 export interface MagneticLavaRectangleProps {
   // Basic rectangle props - now optional for dynamic sizing
@@ -34,12 +45,8 @@ export interface MagneticLavaRectangleProps {
 }
 
 // Physics configuration interface
-interface PhysicsConfig {
-  width: number;
-  height: number;
-  stretchiness: number;
-  minDistance: number;
-  perceivedCursorOffset: number;
+interface PhysicsConfig extends BasePhysicsConfig {
+  // Additional properties specific to this component can be added here
 }
 
 // Default physics configuration
@@ -69,30 +76,7 @@ const MATH_CONSTANTS = {
   SORT_ORDER_DEFAULT: 5
 } as const;
 
-// Point interface
-interface RectPoint {
-  x: number;
-  y: number;
-  side: 'top' | 'right' | 'bottom' | 'left';
-  baseX: number;
-  baseY: number;
-  sidePosition: number;
-}
 
-// Utility functions
-const VectorUtils = {
-  calculateDistance: (x1: number, y1: number, x2: number, y2: number): number => 
-    Math.sqrt(Math.pow(x2 - x1, MATH_CONSTANTS.POWER_OF_TWO) + Math.pow(y2 - y1, MATH_CONSTANTS.POWER_OF_TWO)),
-
-  normalizeVector: (x: number, y: number): { x: number; y: number; length: number } => {
-    const length = Math.sqrt(x * x + y * y);
-    return {
-      x: length > 0 ? x / length : 0,
-      y: length > 0 ? y / length : 0,
-      length
-    };
-  }
-};
 
 const calculateCornerNormal = (side: string, sidePosition: number): { x: number; y: number } => {
   switch (side) {
@@ -136,88 +120,8 @@ const calculateSurfaceNormal = (point: RectPoint, isCorner: boolean): { x: numbe
   }
 };
 
-const CoordinateUtils = {
-  screenToSvg: (screenCoord: number, screenCenter: number, svgCenter: number): number => 
-    (screenCoord - screenCenter) + svgCenter
-};
 
-const PhysicsUtils = {
-  calculateBaseMagneticForce: (distance: number, effectiveDistance: number): number => {
-    const normalizedDistance = Math.min(distance / effectiveDistance, 1);
-    return Math.pow(1 - normalizedDistance, MATH_CONSTANTS.POWER_OF_TWO);
-  },
 
-  calculateStretch: (magneticForce: number, strength: number, config: PhysicsConfig): number => 
-    magneticForce * strength * config.stretchiness * MATH_CONSTANTS.STRETCH_SCALE_FACTOR
-};
-
-const generateCornerPoints = (dimensions: { width: number; height: number }): RectPoint[] => [
-  { x: 0, y: 0, baseX: 0, baseY: 0, side: 'top', sidePosition: 0 },
-  { x: dimensions.width, y: 0, baseX: dimensions.width, baseY: 0, side: 'top', sidePosition: 1 },
-  { x: dimensions.width, y: dimensions.height, baseX: dimensions.width, baseY: dimensions.height, side: 'bottom', sidePosition: 0 },
-  { x: 0, y: dimensions.height, baseX: 0, baseY: dimensions.height, side: 'bottom', sidePosition: 1 }
-];
-
-const generateSidePoints = (params: {
-  side: 'top' | 'right' | 'bottom' | 'left';
-  pointsPerSide: number;
-  dimensions: { width: number; height: number };
-}): RectPoint[] => {
-  const { side, pointsPerSide, dimensions } = params;
-  const points: RectPoint[] = [];
-  
-  for (let i = 1; i < pointsPerSide - 1; i++) {
-    const t = i / (pointsPerSide - 1);
-    let x: number, y: number;
-
-    switch (side) {
-      case 'top':
-        x = t * dimensions.width;
-        y = 0;
-        break;
-      case 'right':
-        x = dimensions.width;
-        y = t * dimensions.height;
-        break;
-      case 'bottom':
-        x = dimensions.width - t * dimensions.width;
-        y = dimensions.height;
-        break;
-      case 'left':
-        x = 0;
-        y = dimensions.height - t * dimensions.height;
-        break;
-    }
-
-    points.push({
-      x, y,
-      baseX: x, baseY: y,
-      side,
-      sidePosition: t
-    });
-  }
-  
-  return points;
-};
-
-const generateRectanglePoints = (params: {
-  dimensions: { width: number; height: number };
-  activeSides: Array<'top' | 'right' | 'bottom' | 'left'>;
-  pointsPerSide: number;
-}): RectPoint[] => {
-  const { dimensions, activeSides, pointsPerSide } = params;
-  const points: RectPoint[] = [];
-
-  const corners = generateCornerPoints(dimensions);
-  points.push(...corners);
-
-  activeSides.forEach(side => {
-    const sidePoints = generateSidePoints({ side, pointsPerSide, dimensions });
-    points.push(...sidePoints);
-  });
-
-  return points;
-};
 
 const calculatePerceivedCursor = (params: {
   mouseX: number;
@@ -287,6 +191,7 @@ const applyCornerDampening = (params: {
   return strength;
 };
 
+ 
 const calculateDeformation = (params: {
   point: RectPoint;
   cursorX: number;
@@ -320,6 +225,31 @@ const calculateDeformation = (params: {
   return { newX, newY, directionX, directionY };
 };
 
+type ClampCornerArgs = { point: RectPoint; newX: number; newY: number; rectCenterX: number; rectCenterY: number };
+const clampCornerMovement = ({ point, newX, newY, rectCenterX, rectCenterY }: ClampCornerArgs) => {
+  const isLeftCorner = point.baseX < rectCenterX;
+  const isTopCorner = point.baseY < rectCenterY;
+  return {
+    x: (isLeftCorner && newX > point.baseX) || (!isLeftCorner && newX < point.baseX) ? point.baseX : newX,
+    y: (isTopCorner && newY > point.baseY) || (!isTopCorner && newY < point.baseY) ? point.baseY : newY
+  };
+};
+
+const clampSideMovement = (point: RectPoint, nx: number, ny: number) => {
+  switch (point.side) {
+    case 'top':
+      return { x: nx, y: Math.min(ny, point.baseY) };
+    case 'right':
+      return { x: Math.max(nx, point.baseX), y: ny };
+    case 'bottom':
+      return { x: nx, y: Math.max(ny, point.baseY) };
+    case 'left':
+      return { x: Math.min(nx, point.baseX), y: ny };
+    default:
+      return { x: nx, y: ny };
+  }
+};
+
 const preventInwardMovement = (params: {
   point: RectPoint;
   newX: number;
@@ -332,93 +262,206 @@ const preventInwardMovement = (params: {
   if (isCorner) {
     const rectCenterX = config.width / MATH_CONSTANTS.HALF;
     const rectCenterY = config.height / MATH_CONSTANTS.HALF;
-
-    const isLeftCorner = point.baseX < rectCenterX;
-    const isTopCorner = point.baseY < rectCenterY;
-
-    let finalX = newX;
-    let finalY = newY;
-
-    if (isLeftCorner && newX > point.baseX) finalX = point.baseX;
-    if (!isLeftCorner && newX < point.baseX) finalX = point.baseX;
-    if (isTopCorner && newY > point.baseY) finalY = point.baseY;
-    if (!isTopCorner && newY < point.baseY) finalY = point.baseY;
-
-    return { x: finalX, y: finalY };
+    return clampCornerMovement({ point, newX, newY, rectCenterX, rectCenterY });
   }
-
-  let finalX = newX;
-  let finalY = newY;
-
-  switch (point.side) {
-    case 'top':
-      if (newY > point.baseY) finalY = point.baseY;
-      break;
-    case 'right':
-      if (newX < point.baseX) finalX = point.baseX;
-      break;
-    case 'bottom':
-      if (newY < point.baseY) finalY = point.baseY;
-      break;
-    case 'left':
-      if (newX > point.baseX) finalX = point.baseX;
-      break;
-  }
-
-  return { x: finalX, y: finalY };
+  const clamped = clampSideMovement(point, newX, newY);
+  return { x: clamped.x, y: clamped.y };
 };
 
-const getSortOrder = (point: RectPoint): number => {
-  if (point.side === 'top' && point.sidePosition === 0) return MATH_CONSTANTS.SORT_ORDER_TOP_CORNER;
-  if (point.side === 'top') return MATH_CONSTANTS.SORT_ORDER_TOP;
-  if (point.side === 'right') return MATH_CONSTANTS.SORT_ORDER_RIGHT;
-  if (point.side === 'bottom') return MATH_CONSTANTS.SORT_ORDER_BOTTOM;
-  if (point.side === 'left') return MATH_CONSTANTS.SORT_ORDER_LEFT;
-  return MATH_CONSTANTS.SORT_ORDER_DEFAULT;
+
+type TransformContext = {
+  activeSides: Array<'top' | 'right' | 'bottom' | 'left'>;
+  physicsConfig: PhysicsConfig;
+  perceivedCursor: { x: number; y: number };
+  svgCenterX: number;
+  svgCenterY: number;
+  centerX: number;
+  centerY: number;
+  pathStrength: number;
+  cornerDeflectionFactor: number;
+  deformationMode: 'cursor' | 'surface-normal';
+  effectiveDistance: number;
 };
 
-export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
-  width: propWidth,
-  height: propHeight,
-  activeSides,
-  pointsPerSide = 20,
-  fill,
-  className = '',
-  style = {},
-  strength,
-  distance,
-  duration,
-  ease,
-  fullWindow = false,
-  onCursorInside,
-  onMouseMove,
-  stretchiness = DEFAULT_PHYSICS.stretchiness,
-  minDistance = DEFAULT_PHYSICS.minDistance,
-  perceivedCursorOffset = DEFAULT_PHYSICS.perceivedCursorOffset,
-  cornerDeflectionFactor = 0.2,
-  deformationMode = 'surface-normal',
-}) => {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const pathRef = useRef<SVGPathElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isInside, setIsInside] = useState(false);
-  const [currentPath, setCurrentPath] = useState('');
-  
-  const [measuredDimensions, setMeasuredDimensions] = useState<{ width: number; height: number } | null>(null);
-  
-  const width = propWidth ?? measuredDimensions?.width ?? 0;
-  const height = propHeight ?? measuredDimensions?.height ?? 0;
-
-  const physicsConfig: PhysicsConfig = {
-    ...DEFAULT_PHYSICS,
-    width,
-    height,
-    stretchiness,
-    minDistance,
-    perceivedCursorOffset
+const computeAttraction = (point: RectPoint, isCornerPoint: boolean, ctx: TransformContext) => {
+  const { perceivedCursor, svgCenterX, svgCenterY, centerX, centerY, physicsConfig, pathStrength, cornerDeflectionFactor, deformationMode, effectiveDistance } = ctx;
+  const pointScreenX = centerX + (point.baseX - svgCenterX);
+  const pointScreenY = centerY + (point.baseY - svgCenterY);
+  const rawPointDistance = VectorUtils.calculateDistance(perceivedCursor.x, perceivedCursor.y, pointScreenX, pointScreenY);
+  const pointDistanceToMouse = Math.max(rawPointDistance, physicsConfig.minDistance);
+  const baseMagneticForce = PhysicsUtils.calculateBaseMagneticForce(pointDistanceToMouse, effectiveDistance);
+  let attractionStrength = baseMagneticForce * pathStrength;
+  attractionStrength = applyCornerDampening({ strength: attractionStrength, isCorner: isCornerPoint, point, factor: cornerDeflectionFactor });
+  const { newX, newY, directionX, directionY } = calculateDeformation({
+    point,
+    cursorX: perceivedCursor.x - centerX + svgCenterX,
+    cursorY: perceivedCursor.y - centerY + svgCenterY,
+    strength: attractionStrength,
+    mode: deformationMode,
+    isCorner: isCornerPoint
+  });
+  const stretchAmount = PhysicsUtils.calculateStretch(baseMagneticForce, pathStrength, physicsConfig);
+  return {
+    x: stretchAmount > 0 ? newX + directionX * stretchAmount : newX,
+    y: stretchAmount > 0 ? newY + directionY * stretchAmount : newY
   };
+};
 
-  const isPointInCurrentShape = useCallback((x: number, y: number): boolean => {
+const transformPoint = (point: RectPoint, ctx: TransformContext): RectPoint => {
+  const { activeSides, physicsConfig } = ctx;
+
+  const isActive = activeSides.includes(point.side);
+  const isCornerPoint = point.sidePosition === 0 || point.sidePosition === 1;
+
+  if (isCornerPoint) {
+    const cornerIsActive = checkCornerActivity(point, activeSides);
+    if (!cornerIsActive) return { ...point };
+  } else if (!isActive) {
+    return { ...point };
+  }
+
+  const { x: adjX, y: adjY } = computeAttraction(point, isCornerPoint, ctx);
+  const prevented = preventInwardMovement({
+    point,
+    newX: adjX,
+    newY: adjY,
+    isCorner: isCornerPoint,
+    config: physicsConfig
+  });
+  return { ...point, x: prevented.x, y: prevented.y };
+};
+
+const buildPathFromPoints = (points: RectPoint[]): string => {
+  if (points.length === 0) return '';
+  let path = `M ${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    path += ` L ${points[i].x},${points[i].y}`;
+  }
+  return path + ' Z';
+};
+
+const computeEffectiveDistance = (
+  fullWindow: boolean,
+  rectCenterX: number,
+  rectCenterY: number,
+  distance: number
+): number => fullWindow
+    ? Math.max(rectCenterX, window.innerWidth - rectCenterX, rectCenterY, window.innerHeight - rectCenterY)
+    : distance;
+
+type AnimateArgs = { el: SVGPathElement; d: string; duration: number; ease: string; multiplier?: number };
+const animatePath = ({ el, d, duration, ease, multiplier = 1 }: AnimateArgs) => {
+  gsap.to(el, {
+    attr: { d },
+    duration: duration * multiplier,
+    ease
+  });
+};
+
+// Hooks to reduce component size/complexity
+const useMeasuredRect = (
+  containerRef: React.RefObject<HTMLDivElement>,
+  propWidth?: number,
+  propHeight?: number
+) => {
+  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (containerRef.current && !propWidth && !propHeight && !measured) {
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setMeasured({ width: rect.width, height: rect.height });
+      }
+    }
+  }, [containerRef, propWidth, propHeight, measured]);
+
+  useEffect(() => {
+    if (!containerRef.current || (propWidth !== undefined && propHeight !== undefined)) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) setMeasured({ width, height });
+      }
+    });
+
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [containerRef, propWidth, propHeight]);
+
+  return {
+    width: propWidth ?? measured?.width ?? 0,
+    height: propHeight ?? measured?.height ?? 0
+  };
+};
+
+interface LavaPathGeneratorConfig {
+  width: number;
+  height: number;
+  activeSides: Array<'top' | 'right' | 'bottom' | 'left'>;
+  pointsPerSide: number;
+  perceivedCursorOffset: number;
+  physicsConfig: PhysicsConfig;
+  cornerDeflectionFactor: number;
+  deformationMode: 'cursor' | 'surface-normal';
+  svgRef: React.RefObject<SVGSVGElement>;
+}
+
+const useLavaPathGenerator = (config: LavaPathGeneratorConfig) => useCallback((params: {
+    mouseX: number;
+    mouseY: number;
+    centerX: number;
+    centerY: number;
+    strength: number;
+    effectiveDistance: number;
+  }): string => {
+    const { width, height, activeSides, pointsPerSide, perceivedCursorOffset, physicsConfig, cornerDeflectionFactor, deformationMode, svgRef } = config;
+    const { mouseX, mouseY, centerX, centerY, strength, effectiveDistance } = params;
+    const points = generateRectanglePoints({
+      dimensions: { width, height },
+      activeSides,
+      pointsPerSide
+    });
+    
+    if (!svgRef.current || points.length === 0) return '';
+
+    const ctx: TransformContext = {
+      activeSides,
+      physicsConfig,
+      perceivedCursor: calculatePerceivedCursor({ mouseX, mouseY, centerX, centerY, offset: perceivedCursorOffset }),
+      svgCenterX: width / MATH_CONSTANTS.HALF,
+      svgCenterY: height / MATH_CONSTANTS.HALF,
+      centerX,
+      centerY,
+      pathStrength: strength,
+      cornerDeflectionFactor,
+      deformationMode,
+      effectiveDistance
+    };
+    const transformedPoints = points.map((point) => transformPoint(point, ctx));
+
+    const sortedPoints = transformedPoints.sort((a, b) => {
+      const orderA = getSortOrder(a);
+      const orderB = getSortOrder(b);
+
+      if (orderA !== orderB) return orderA - orderB;
+      return a.sidePosition - b.sidePosition;
+    });
+
+    if (sortedPoints.length === 0) return '';
+    return buildPathFromPoints(sortedPoints);
+  }, [config]);
+
+interface ShapeDetectionConfig {
+  svgRef: React.RefObject<SVGSVGElement>;
+  pathRef: React.RefObject<SVGPathElement>;
+  currentPath: string;
+  width: number;
+  height: number;
+}
+
+const useShapeDetection = (config: ShapeDetectionConfig) => useCallback((x: number, y: number): boolean => {
+    const { svgRef, pathRef, currentPath, width, height } = config;
     if (!svgRef.current || !pathRef.current || !currentPath) return false;
 
     const rect = svgRef.current.getBoundingClientRect();
@@ -437,229 +480,116 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
     } catch {
       return localX >= 0 && localX <= width && localY >= 0 && localY <= height;
     }
-  }, [currentPath, width, height]);
+  }, [config]);
 
-  const generateLavaPath = useCallback((params: {
+const useInsideDetection = (
+  isPointInCurrentShape: (x: number, y: number) => boolean,
+  isInside: boolean,
+  setIsInside: React.Dispatch<React.SetStateAction<boolean>>,
+  onCursorInside?: (isInside: boolean) => void
+) => useCallback((mouseX: number, mouseY: number) => {
+    const currentlyInside = isPointInCurrentShape(mouseX, mouseY);
+    if (currentlyInside !== isInside) {
+      setIsInside(currentlyInside);
+      onCursorInside?.(currentlyInside);
+    }
+  }, [isPointInCurrentShape, isInside, setIsInside, onCursorInside]);
+
+const usePathAnimation = (
+  pathRef: React.RefObject<SVGPathElement>,
+  setCurrentPath: React.Dispatch<React.SetStateAction<string>>,
+  duration: number,
+  ease: string
+) => useCallback((path: string, isActive: boolean) => {
+    setCurrentPath(path);
+    if (pathRef.current) {
+      const multiplier = isActive ? MATH_CONSTANTS.DURATION_MULTIPLIER : 1;
+      animatePath({ el: pathRef.current, d: path, duration, ease, multiplier });
+    }
+  }, [pathRef, setCurrentPath, duration, ease]);
+
+const useMagneticEffect = (config: {
+  containerRef: React.RefObject<HTMLDivElement>;
+  svgRef: React.RefObject<SVGSVGElement>;
+  handleInsideDetection: (x: number, y: number) => void;
+  animatePath: (path: string, isActive: boolean) => void;
+  generateLavaPath: (params: {
     mouseX: number;
     mouseY: number;
     centerX: number;
     centerY: number;
     strength: number;
     effectiveDistance: number;
-  }): string => {
-    const { mouseX, mouseY, centerX, centerY, strength: pathStrength, effectiveDistance } = params;
-    const points = generateRectanglePoints({
-      dimensions: { width, height },
-      activeSides,
-      pointsPerSide
-    });
+  }) => string;
+  fullWindow: boolean;
+  distance: number;
+  strength: number;
+  width: number;
+  height: number;
+}) => useCallback((mouseX: number, mouseY: number) => {
+    const { containerRef, svgRef, handleInsideDetection, animatePath, generateLavaPath, fullWindow, distance, strength, width: _width, height: _height } = config;
     
-    if (!svgRef.current || points.length === 0) return '';
-
-    const svgCenterX = width / MATH_CONSTANTS.HALF;
-    const svgCenterY = height / MATH_CONSTANTS.HALF;
-
-    const perceivedCursor = calculatePerceivedCursor({
-      mouseX,
-      mouseY,
-      centerX,
-      centerY,
-      offset: perceivedCursorOffset
-    });
-    
-    const cursorSvgX = CoordinateUtils.screenToSvg(perceivedCursor.x, centerX, svgCenterX);
-    const cursorSvgY = CoordinateUtils.screenToSvg(perceivedCursor.y, centerY, svgCenterY);
-
-    const transformedPoints = points.map(point => {
-      const isActive = activeSides.includes(point.side);
-      const isCornerPoint = (point.sidePosition === 0 || point.sidePosition === 1);
-
-      if (isCornerPoint) {
-        const cornerIsActive = checkCornerActivity(point, activeSides);
-        if (!cornerIsActive) {
-          return { ...point };
-        }
-      } else if (!isActive) {
-        return { ...point };
-      }
-
-      const pointScreenX = centerX + (point.baseX - svgCenterX);
-      const pointScreenY = centerY + (point.baseY - svgCenterY);
-
-      const rawPointDistance = VectorUtils.calculateDistance(
-        perceivedCursor.x, 
-        perceivedCursor.y, 
-        pointScreenX, 
-        pointScreenY
-      );
-      const pointDistanceToMouse = Math.max(rawPointDistance, physicsConfig.minDistance);
-
-      const baseMagneticForce = PhysicsUtils.calculateBaseMagneticForce(pointDistanceToMouse, effectiveDistance);
-      let attractionStrength = baseMagneticForce * pathStrength;
-
-      attractionStrength = applyCornerDampening({
-        strength: attractionStrength,
-        isCorner: isCornerPoint,
-        point,
-        factor: cornerDeflectionFactor
-      });
-
-      const { newX, newY, directionX, directionY } = calculateDeformation({
-        point,
-        cursorX: cursorSvgX,
-        cursorY: cursorSvgY,
-        strength: attractionStrength,
-        mode: deformationMode,
-        isCorner: isCornerPoint
-      });
-
-      const stretchAmount = PhysicsUtils.calculateStretch(baseMagneticForce, pathStrength, physicsConfig);
-      let finalX = newX;
-      let finalY = newY;
-      
-      if (stretchAmount > 0) {
-        finalX += directionX * stretchAmount;
-        finalY += directionY * stretchAmount;
-      }
-
-      const preventedMovement = preventInwardMovement({
-        point,
-        newX: finalX,
-        newY: finalY,
-        isCorner: isCornerPoint,
-        config: physicsConfig
-      });
-
-      return { ...point, x: preventedMovement.x, y: preventedMovement.y };
-    });
-
-    const sortedPoints = transformedPoints.sort((a, b) => {
-      const orderA = getSortOrder(a);
-      const orderB = getSortOrder(b);
-
-      if (orderA !== orderB) return orderA - orderB;
-      return a.sidePosition - b.sidePosition;
-    });
-
-    if (sortedPoints.length === 0) return '';
-
-    let path = `M ${sortedPoints[0].x},${sortedPoints[0].y}`;
-    for (let i = 1; i < sortedPoints.length; i++) {
-      path += ` L ${sortedPoints[i].x},${sortedPoints[i].y}`;
-    }
-    path += ' Z';
-    return path;
-  }, [width, height, activeSides, pointsPerSide, perceivedCursorOffset, physicsConfig, cornerDeflectionFactor, deformationMode]);
-
-  const calculateMagneticEffect = useCallback((mouseX: number, mouseY: number) => {
     if (!containerRef.current || !svgRef.current) return;
 
     const svgRect = svgRef.current.getBoundingClientRect();
     const rectCenterX = svgRect.left + svgRect.width / MATH_CONSTANTS.HALF;
     const rectCenterY = svgRect.top + svgRect.height / MATH_CONSTANTS.HALF;
 
-    const currentlyInside = isPointInCurrentShape(mouseX, mouseY);
-    if (currentlyInside !== isInside) {
-      setIsInside(currentlyInside);
-      onCursorInside?.(currentlyInside);
-    }
+    handleInsideDetection(mouseX, mouseY);
 
-    const actualDistance = VectorUtils.calculateDistance(mouseX, mouseY, rectCenterX, rectCenterY);
-    const effectiveDistance = fullWindow
-      ? Math.max(rectCenterX, window.innerWidth - rectCenterX, rectCenterY, window.innerHeight - rectCenterY)
-      : distance;
-
-    const isActive = fullWindow || actualDistance < distance;
-
-    if (isActive) {
-      const newPath = generateLavaPath({
-        mouseX,
-        mouseY,
-        centerX: rectCenterX,
-        centerY: rectCenterY,
-        strength,
-        effectiveDistance
-      });
-
-      setCurrentPath(newPath);
-
-      if (pathRef.current) {
-        gsap.to(pathRef.current, {
-          attr: { d: newPath },
-          duration: duration * MATH_CONSTANTS.DURATION_MULTIPLIER,
-          ease: ease
-        });
-      }
-    } else {
-      const basePath = generateLavaPath({
-        mouseX: rectCenterX + MATH_CONSTANTS.FAR_AWAY_DISTANCE,
-        mouseY: rectCenterY + MATH_CONSTANTS.FAR_AWAY_DISTANCE,
-        centerX: rectCenterX,
-        centerY: rectCenterY,
-        strength: 0,
-        effectiveDistance
-      });
-
-      setCurrentPath(basePath);
-
-      if (pathRef.current) {
-        gsap.to(pathRef.current, {
-          attr: { d: basePath },
-          duration: duration,
-          ease: ease
-        });
-      }
-    }
-  }, [isPointInCurrentShape, isInside, onCursorInside, fullWindow, distance, generateLavaPath, strength, duration, ease]);
-
-  useLayoutEffect(() => {
-    if (containerRef.current && !propWidth && !propHeight && !measuredDimensions) {
-      const rect = containerRef.current.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setMeasuredDimensions({ width: rect.width, height: rect.height });
-      }
-    }
-  }, [propWidth, propHeight, measuredDimensions]);
-
-  useEffect(() => {
-    if (!containerRef.current || (propWidth !== undefined && propHeight !== undefined)) {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width: measuredWidth, height: measuredHeight } = entry.contentRect;
-        
-        if (measuredWidth > 0 && measuredHeight > 0) {
-          setMeasuredDimensions({
-            width: measuredWidth,
-            height: measuredHeight
-          });
-        }
-      }
+    // Calculate distance to rectangle boundary (negative when inside, positive when outside)
+    const distanceToBoundary = calculateDistanceToRectangleBoundary({
+      cursorX: mouseX,
+      cursorY: mouseY,
+      rectX: svgRect.left,
+      rectY: svgRect.top,
+      rectWidth: svgRect.width,
+      rectHeight: svgRect.height
     });
 
-    resizeObserver.observe(containerRef.current);
+    // Calculate distance-based strength (0 when inside, smooth transition when outside)
+    const effectiveStrength = calculateDistanceBasedStrength(distanceToBoundary, strength);
 
-    return () => {
-      resizeObserver.disconnect();
+    const actualDistance = VectorUtils.calculateDistance(mouseX, mouseY, rectCenterX, rectCenterY);
+    const effectiveDistance = computeEffectiveDistance(fullWindow, rectCenterX, rectCenterY, distance);
+    const isActive = fullWindow || actualDistance < distance;
+
+    const pathParams = {
+      mouseX: isActive ? mouseX : rectCenterX + MATH_CONSTANTS.FAR_AWAY_DISTANCE,
+      mouseY: isActive ? mouseY : rectCenterY + MATH_CONSTANTS.FAR_AWAY_DISTANCE,
+      centerX: rectCenterX,
+      centerY: rectCenterY,
+      strength: isActive ? effectiveStrength : 0,
+      effectiveDistance
     };
-  }, [propWidth, propHeight]);
 
-  useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
+    const newPath = generateLavaPath(pathParams);
+    animatePath(newPath, isActive);
+  }, [config]);
+
+const useGlobalListeners = (
+  width: number,
+  height: number,
+  calculateMagneticEffect: (x: number, y: number) => void,
+  onMouseMove?: (e: MouseEvent) => void
+) => {
+  const handleGlobalMouseMove = useCallback(
+    (e: MouseEvent) => {
       if (width > 0 && height > 0) {
         calculateMagneticEffect(e.clientX, e.clientY);
       }
       onMouseMove?.(e);
-    };
+    },
+    [width, height, calculateMagneticEffect, onMouseMove]
+  );
 
-    const handleScroll = () => {
-      if (width > 0 && height > 0) {
-        calculateMagneticEffect(0, 0);
-      }
-    };
+  const handleScroll = useCallback(() => {
+    if (width > 0 && height > 0) {
+      calculateMagneticEffect(0, 0);
+    }
+  }, [width, height, calculateMagneticEffect]);
 
+  useEffect(() => {
     document.addEventListener('mousemove', handleGlobalMouseMove);
     document.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -669,8 +599,32 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
       document.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [calculateMagneticEffect, onMouseMove, width, height]);
+  }, [handleGlobalMouseMove, handleScroll]);
+};
 
+type InitialPathArgs = {
+  svgRef: React.RefObject<SVGSVGElement>;
+  pathRef: React.RefObject<SVGPathElement>;
+  width: number;
+  height: number;
+  generateLavaPath: (p: {
+    mouseX: number;
+    mouseY: number;
+    centerX: number;
+    centerY: number;
+    strength: number;
+    effectiveDistance: number;
+  }) => string;
+  setCurrentPath: React.Dispatch<React.SetStateAction<string>>;
+};
+const useInitialPath = ({
+  svgRef,
+  pathRef,
+  width,
+  height,
+  generateLavaPath,
+  setCurrentPath
+}: InitialPathArgs) => {
   useEffect(() => {
     if (pathRef.current && svgRef.current && width > 0 && height > 0) {
       const svgCenterX = width / MATH_CONSTANTS.HALF;
@@ -688,7 +642,79 @@ export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = ({
       pathRef.current.setAttribute('d', initialPath);
       setCurrentPath(initialPath);
     }
-  }, [width, height, generateLavaPath]);
+  }, [svgRef, pathRef, width, height, generateLavaPath, setCurrentPath]);
+};
+
+const useRectangleRefs = () => {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const pathRef = useRef<SVGPathElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInside, setIsInside] = useState(false);
+  const [currentPath, setCurrentPath] = useState('');
+  return { svgRef, pathRef, containerRef, isInside, setIsInside, currentPath, setCurrentPath };
+};
+
+const usePhysicsSetup = (props: MagneticLavaRectangleProps, refs: ReturnType<typeof useRectangleRefs>) => {
+  const { width: propWidth, height: propHeight, stretchiness = DEFAULT_PHYSICS.stretchiness, minDistance = DEFAULT_PHYSICS.minDistance, perceivedCursorOffset = DEFAULT_PHYSICS.perceivedCursorOffset } = props;
+  const { containerRef } = refs;
+  
+  const { width, height } = useMeasuredRect(containerRef, propWidth, propHeight);
+  
+  const physicsConfig: PhysicsConfig = React.useMemo(() => ({
+    ...DEFAULT_PHYSICS,
+    width,
+    height,
+    stretchiness,
+    minDistance,
+    perceivedCursorOffset
+  }), [width, height, stretchiness, minDistance, perceivedCursorOffset]);
+
+  return { width, height, physicsConfig };
+};
+
+const useMagneticRectangleLogic = (props: MagneticLavaRectangleProps) => {
+  const { activeSides, pointsPerSide = 20, strength, distance, duration, ease, fullWindow = false, onCursorInside, onMouseMove, cornerDeflectionFactor = 0.2, deformationMode = 'surface-normal', perceivedCursorOffset = DEFAULT_PHYSICS.perceivedCursorOffset } = props;
+  
+  const refs = useRectangleRefs();
+  const { svgRef, pathRef, containerRef, isInside, setIsInside, currentPath, setCurrentPath } = refs;
+  const { width, height, physicsConfig } = usePhysicsSetup(props, refs);
+
+  const generateLavaPath = useLavaPathGenerator({
+    width,
+    height,
+    activeSides,
+    pointsPerSide,
+    perceivedCursorOffset,
+    physicsConfig,
+    cornerDeflectionFactor,
+    deformationMode,
+    svgRef
+  });
+
+  const isPointInCurrentShape = useShapeDetection({
+    svgRef,
+    pathRef,
+    currentPath,
+    width,
+    height
+  });
+  const handleInsideDetection = useInsideDetection(isPointInCurrentShape, isInside, setIsInside, onCursorInside);
+  const animatePathWithState = usePathAnimation(pathRef, setCurrentPath, duration, ease);
+
+  const calculateMagneticEffect = useMagneticEffect({
+    containerRef, svgRef, handleInsideDetection, animatePath: animatePathWithState,
+    generateLavaPath, fullWindow, distance, strength, width, height
+  });
+
+  useGlobalListeners(width, height, calculateMagneticEffect, onMouseMove);
+  useInitialPath({ svgRef, pathRef, width, height, generateLavaPath, setCurrentPath });
+
+  return { svgRef, pathRef, containerRef, width, height };
+};
+
+export const MagneticLavaRectangle: React.FC<MagneticLavaRectangleProps> = (props) => {
+  const { fill, className = '', style = {} } = props;
+  const { svgRef, pathRef, containerRef, width, height } = useMagneticRectangleLogic(props);
 
   if (width <= 0 || height <= 0) {
     return (
